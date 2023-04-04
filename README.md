@@ -1,8 +1,7 @@
-<p align="center">
-  <img src="http://some_place.com/image.png" />
-</p>
+<p align="center"><img src="https://raw.githubusercontent.com/apegroup/revolver/main/assets/logo.svg" width="150"/></p>
 <h1 align="center"> Revolver</h1>
 <p align="center"> Immutable event based state management framework</p>
+
 
 <br><br/>
 ## how it works
