@@ -1,4 +1,4 @@
-rootProject.name = "KMM-MVI"
+rootProject.name = "revolver"
 
 pluginManagement {
     repositories {
