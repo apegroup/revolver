@@ -5,7 +5,7 @@
 <p align="center"> Immutable event based state management framework</p>
 
 <br><br/>
-### how it works
+## how it works
 
 Revolver is a Kotlin Multiplatform state management solution that enforces one single immutable state. Information is passed from clients to KMM by emitting `Events` to a `ViewModel`. this `ViewModel` will have readonly `State` and `Effect` flows that the clients can subscribe to for updates.
 
@@ -208,7 +208,7 @@ internal class ExampleViewModelTests {
 ```
 as you can see we use Mockative to mock our repository, so we can purely focus on testing the viewmodel. Then we use Turbine to test the `viewmodel.state` (you can also test `viewmodel.effect`).
 
-
-### Contribution
+<br><br/>
+## Contribution
 
 This package is very much still in experimental mode and using this in a production environment is at your own risk. Bug reports, feature requests, or contributions are very much appreciated!
