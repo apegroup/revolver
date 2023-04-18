@@ -10,7 +10,7 @@ buildscript {
 
 plugins {
     kotlin("multiplatform") version "1.8.0"
-    id("com.android.library") version "7.4.0-beta02"
+    id("com.android.library") version "7.3.1"
     id("maven-publish")
 }
 

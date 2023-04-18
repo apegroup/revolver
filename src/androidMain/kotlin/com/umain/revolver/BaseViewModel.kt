@@ -1,6 +1,6 @@
 package com.umain.revolver
 
-import androidx.lifecycle.ViewModelimport com.umain.lib.mvi.createViewModelScope
+import androidx.lifecycle.ViewModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 
