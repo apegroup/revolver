@@ -11,8 +11,7 @@ buildscript {
 plugins {
     kotlin("multiplatform") version "1.8.0"
     id("com.android.library") version "7.4.0-beta02"
-    `version-catalog`
-    `maven-publish`
+    id("maven-publish")
 }
 
 /* Library Specs */
@@ -33,7 +32,12 @@ repositories {
 
 kotlin {
 
-    android()
+    android {
+        mavenPublication {
+            artifactId = project.name
+        }
+    }
+
     iosX64()
     iosArm64()
     iosSimulatorArm64()
@@ -87,6 +91,24 @@ kotlin {
     }
 }
 
+// Configuration for Android package publishing to GitHub Package Registry
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/$libDeveloperOrg/$libMavenPublish")
+
+            val ghUsername: String? = System.getenv("GH_USERNAME") ?: properties["GH_USERNAME"]?.toString()
+            val ghToken: String? = System.getenv("GH_TOKEN") ?: properties["GH_TOKEN"]?.toString()
+
+            credentials {
+                username = ghUsername
+                password = ghToken
+            }
+        }
+    }
+}
+
 android {
     namespace = libAndroidNamespace
     compileSdk = (findProperty("android.compileSdk") as String).toInt()
@@ -100,5 +122,12 @@ android {
         isCoreLibraryDesugaringEnabled = false
         sourceCompatibility = JavaVersion.VERSION_1_8
         targetCompatibility = JavaVersion.VERSION_1_8
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+            withJavadocJar()
+        }
     }
 }
