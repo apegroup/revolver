@@ -12,7 +12,7 @@ interface Emitter<STATE, EFFECT> {
 }
 
 /**
- * The method signature for an event handler in a ViewModel.
+ * The method signature for an event handler in a RevolverViewModel.
  *
  * Example event handler:
  * ```
@@ -33,21 +33,21 @@ typealias ErrorHandler<ERROR, STATE, EFFECT> = suspend (
 ) -> Unit
 
 /**
- * Emitted by the clients to the KMM ViewModel when something has happened that needs to be handled.
+ * Emitted by the clients to the KMM RevolverViewModel when something has happened that needs to be handled.
  * E.g. User selected the language in the market selector
  */
-interface Event
+interface RevolverEvent
 
 /**
  * Emitted by KMM to the clients and describes the view that should be shown by the clients.
  * E.g. A list of markets to show in the market picker
  */
-interface State
+interface RevolverState
 
 /**
  * Emitted by KMM to the clients to inform them that something has happened which they need to handle.
  * E.g. KMM has completed app initialization, splash screen can be dismissed.
  */
-interface Effect
+interface RevolverEffect
 
 

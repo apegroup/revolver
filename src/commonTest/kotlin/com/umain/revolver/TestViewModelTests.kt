@@ -16,49 +16,49 @@ import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 
-sealed class MyState : State {
-    object InitialState : MyState()
-    object FirstState : MyState()
-    object SecondState : MyState()
+sealed class MyRevolverState : RevolverState {
+    object InitialRevolverState : MyRevolverState()
+    object FirstRevolverState : MyRevolverState()
+    object SecondRevolverState : MyRevolverState()
 
-    object MyErrorState1 : MyState()
-    object MyErrorState2 : MyState()
-    data class GenericErrorState(val commonErrorState: CommonErrorState) : MyState()
+    object MyErrorRevolverState1 : MyRevolverState()
+    object MyErrorRevolverState2 : MyRevolverState()
+    data class GenericErrorRevolverState(val commonErrorState: CommonErrorRevolverState) : MyRevolverState()
 }
 
-sealed class CommonErrorState : State {
-    object UnknownError : CommonErrorState()
+sealed class CommonErrorRevolverState : RevolverState {
+    object UnknownError : CommonErrorRevolverState()
 
-    object NoNetwork : CommonErrorState()
+    object NoNetwork : CommonErrorRevolverState()
 }
 
-sealed class MyEvent : Event {
-    object FirstEvent : MyEvent()
-    object SecondEvent : MyEvent()
-    object TriggerEffectEvent : MyEvent()
-    data class ExceptionEvent(val exception: Throwable) : MyEvent()
+sealed class MyRevolverEvent : RevolverEvent {
+    object FirstRevolverEvent : MyRevolverEvent()
+    object SecondRevolverEvent : MyRevolverEvent()
+    object TriggerEffectRevolverEvent : MyRevolverEvent()
+    data class ExceptionRevolverEvent(val exception: Throwable) : MyRevolverEvent()
 }
 
-sealed class MyEffect : Effect {
-    object FirstEffect : MyEffect()
+sealed class MyRevolverEffect : RevolverEffect {
+    object FirstRevolverEffect : MyRevolverEffect()
 }
 
 class Exception1 : Throwable()
 class Exception2 : Throwable()
 class Exception3 : Throwable()
 
-class DefaultMviErrorHandler<STATE, EFFECT>(val createGenericErrorState: (commonErrorState: CommonErrorState) -> STATE) :
+class DefaultMviErrorHandler<STATE, EFFECT>(val createGenericErrorState: (commonErrorState: CommonErrorRevolverState) -> STATE) :
     MviErrorHandler<STATE, EFFECT, Throwable> {
     override suspend fun handleError(exception: Throwable, emit: Emitter<STATE, EFFECT>) {
         when (exception) {
-            is Exception3 -> emit.state(createGenericErrorState(CommonErrorState.NoNetwork))
-            else -> emit.state(createGenericErrorState(CommonErrorState.UnknownError))
+            is Exception3 -> emit.state(createGenericErrorState(CommonErrorRevolverState.NoNetwork))
+            else -> emit.state(createGenericErrorState(CommonErrorRevolverState.UnknownError))
         }
     }
 }
 
-class MyViewModel : ViewModel<MyEvent, MyState, MyEffect>(
-    initialState = MyState.InitialState,
+class MyRevolverViewModel : RevolverViewModel<MyRevolverEvent, MyRevolverState, MyRevolverEffect>(
+    initialState = MyRevolverState.InitialRevolverState,
 ) {
 
     init {
@@ -67,40 +67,40 @@ class MyViewModel : ViewModel<MyEvent, MyState, MyEffect>(
         addEventHandler(::onTriggerEffectEvent)
         addEventHandler(::onExceptionEvent)
 
-        addErrorHandler { _: Exception1, emit -> emit.state(MyState.MyErrorState1) }
-        addErrorHandler { _: Exception2, emit -> emit.state(MyState.MyErrorState2) }
-        addErrorHandler(DefaultMviErrorHandler { commonErrorState -> MyState.GenericErrorState(commonErrorState) })
+        addErrorHandler { _: Exception1, emit -> emit.state(MyRevolverState.MyErrorRevolverState1) }
+        addErrorHandler { _: Exception2, emit -> emit.state(MyRevolverState.MyErrorRevolverState2) }
+        addErrorHandler(DefaultMviErrorHandler { commonErrorState -> MyRevolverState.GenericErrorRevolverState(commonErrorState) })
     }
 
     private fun onFirstEvent(
-        event: MyEvent.FirstEvent,
-        emit: Emitter<MyState, MyEffect>,
+        event: MyRevolverEvent.FirstRevolverEvent,
+        emit: Emitter<MyRevolverState, MyRevolverEffect>,
     ) {
-        emit.state(MyState.FirstState)
+        emit.state(MyRevolverState.FirstRevolverState)
     }
 
     private fun onSecondEvent(
-        event: MyEvent.SecondEvent,
-        emit: Emitter<MyState, MyEffect>,
+        event: MyRevolverEvent.SecondRevolverEvent,
+        emit: Emitter<MyRevolverState, MyRevolverEffect>,
     ) {
         viewModelScope.launch {
             delay(20)
-            emit.state(MyState.FirstState)
+            emit.state(MyRevolverState.FirstRevolverState)
             delay(20)
-            emit.state(MyState.SecondState)
+            emit.state(MyRevolverState.SecondRevolverState)
         }
     }
 
     private fun onTriggerEffectEvent(
-        event: MyEvent.TriggerEffectEvent,
-        emit: Emitter<MyState, MyEffect>,
+        event: MyRevolverEvent.TriggerEffectRevolverEvent,
+        emit: Emitter<MyRevolverState, MyRevolverEffect>,
     ) {
-        emit.effect(MyEffect.FirstEffect)
+        emit.effect(MyRevolverEffect.FirstRevolverEffect)
     }
 
     private fun onExceptionEvent(
-        event: MyEvent.ExceptionEvent,
-        emit: Emitter<MyState, MyEffect>,
+        event: MyRevolverEvent.ExceptionRevolverEvent,
+        emit: Emitter<MyRevolverState, MyRevolverEffect>,
     ) {
         throw event.exception
     }
@@ -120,122 +120,122 @@ class TestViewModelTests {
     @Test
     fun testInitialStateIsCorrect() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
         viewModel.state.test {
             // When
             val state = awaitItem()
 
             // Then
-            assertIs<MyState.InitialState>(state)
+            assertIs<MyRevolverState.InitialRevolverState>(state)
         }
     }
 
     @Test
     fun testFirstEventEmitsFirstState() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
         viewModel.state.test {
             // When
-            viewModel.emit(MyEvent.FirstEvent)
+            viewModel.emit(MyRevolverEvent.FirstRevolverEvent)
             val initialState = awaitItem()
             val firstState = awaitItem()
 
             // Then
-            assertIs<MyState.InitialState>(initialState)
-            assertIs<MyState.FirstState>(firstState)
+            assertIs<MyRevolverState.InitialRevolverState>(initialState)
+            assertIs<MyRevolverState.FirstRevolverState>(firstState)
         }
     }
 
     @Test
     fun testSecondEventEmitsFirstAndSecondState() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
         viewModel.state.test {
             // When
-            viewModel.emit(MyEvent.SecondEvent)
+            viewModel.emit(MyRevolverEvent.SecondRevolverEvent)
             val initialState = awaitItem()
             val firstState = awaitItem()
             val secondState = awaitItem()
 
             // Then
-            assertIs<MyState.InitialState>(initialState)
-            assertIs<MyState.FirstState>(firstState)
-            assertIs<MyState.SecondState>(secondState)
+            assertIs<MyRevolverState.InitialRevolverState>(initialState)
+            assertIs<MyRevolverState.FirstRevolverState>(firstState)
+            assertIs<MyRevolverState.SecondRevolverState>(secondState)
         }
     }
 
     @Test
     fun testEffectIsEmitted() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
 
         viewModel.effect.test {
             // When
-            viewModel.emit(MyEvent.TriggerEffectEvent)
+            viewModel.emit(MyRevolverEvent.TriggerEffectRevolverEvent)
 
             // Then
-            assertIs<MyEffect.FirstEffect>(awaitItem())
+            assertIs<MyRevolverEffect.FirstRevolverEffect>(awaitItem())
         }
     }
 
     @Test
     fun testHandlesException1() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
         viewModel.state.test {
             // When
             val initialState = awaitItem()
-            viewModel.emit(MyEvent.ExceptionEvent(Exception1()))
+            viewModel.emit(MyRevolverEvent.ExceptionRevolverEvent(Exception1()))
             val errorState = awaitItem()
 
             // Then
-            assertEquals(MyState.MyErrorState1, errorState)
+            assertEquals(MyRevolverState.MyErrorRevolverState1, errorState)
         }
     }
 
     @Test
     fun testHandlesException2() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
         viewModel.state.test {
             // When
             val initialState = awaitItem()
-            viewModel.emit(MyEvent.ExceptionEvent(Exception2()))
+            viewModel.emit(MyRevolverEvent.ExceptionRevolverEvent(Exception2()))
             val errorState = awaitItem()
 
             // Then
-            assertEquals(MyState.MyErrorState2, errorState)
-            assertNotEquals(MyState.MyErrorState1, errorState)
+            assertEquals(MyRevolverState.MyErrorRevolverState2, errorState)
+            assertNotEquals(MyRevolverState.MyErrorRevolverState1, errorState)
         }
     }
 
     @Test
     fun testHandlesException3() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
         viewModel.state.test {
             // When
             val initialState = awaitItem()
-            viewModel.emit(MyEvent.ExceptionEvent(Exception3()))
+            viewModel.emit(MyRevolverEvent.ExceptionRevolverEvent(Exception3()))
             val errorState = awaitItem()
 
             // Then
-            assertEquals(MyState.GenericErrorState(CommonErrorState.NoNetwork), errorState)
+            assertEquals(MyRevolverState.GenericErrorRevolverState(CommonErrorRevolverState.NoNetwork), errorState)
         }
     }
 
     @Test
     fun testHandlesNonThrowable() = runTest {
         // Given
-        val viewModel = MyViewModel()
+        val viewModel = MyRevolverViewModel()
         viewModel.state.test {
             // When
             val initialState = awaitItem()
-            viewModel.emit(MyEvent.ExceptionEvent(RuntimeException("Dummy Exception")))
+            viewModel.emit(MyRevolverEvent.ExceptionRevolverEvent(RuntimeException("Dummy Exception")))
             val errorState = awaitItem()
 
             // Then
-            assertEquals(MyState.GenericErrorState(CommonErrorState.UnknownError), errorState)
+            assertEquals(MyRevolverState.GenericErrorRevolverState(CommonErrorRevolverState.UnknownError), errorState)
         }
     }
 }

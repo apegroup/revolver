@@ -14,16 +14,16 @@ import kotlin.reflect.KClass
 
 /**
  * Extendable class for implementing custom ViewModels. requires types
- * for its Event, State, and Effect implementations e.g.
+ * for its RevolverEvent, RevolverState, and RevolverEffect implementations e.g.
  * ```
- * class ExampleViewModel : ViewModel<ExampleEvent, ExampleState, ExampleEffect>(
+ * class ExampleViewModel : RevolverViewModel<ExampleEvent, ExampleState, ExampleEffect>(
  *    initialState: ExampleState.SomeState
  * )
  * ```
  */
-open class ViewModel<EVENT : Event, STATE : State, EFFECT : Effect>(
+open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFECT : RevolverEffect>(
     initialState: STATE,
-) : ViewModelInterface<EVENT, STATE, EFFECT>, BaseViewModel() {
+) : RevolverViewModelInterface<EVENT, STATE, EFFECT>, BaseViewModel() {
 
     private val eventHandlers = mutableMapOf<KClass<*>, EventHandler<EVENT, STATE, EFFECT>>()
     private val errorHandlers = mutableMapOf<KClass<*>, ErrorHandler<Throwable, STATE, EFFECT>>()
@@ -50,30 +50,30 @@ open class ViewModel<EVENT : Event, STATE : State, EFFECT : Effect>(
     private val emitter: Emitter<STATE, EFFECT> = object : Emitter<STATE, EFFECT> {
         override val state: StateEmitter<STATE> = { state: STATE ->
             viewModelScope.launch {
-                Napier.d("ViewModel ${this@ViewModel::class.simpleName} emitting state ${state::class.simpleName}")
+                Napier.d("RevolverViewModel ${this@RevolverViewModel::class.simpleName} emitting state ${state::class.simpleName}")
                 _state.emit(state)
             }
         }
         override val effect: EffectEmitter<EFFECT> = { effect: EFFECT ->
             viewModelScope.launch {
-                Napier.d("ViewModel ${this@ViewModel::class.simpleName} emitting effect ${effect::class.simpleName}")
+                Napier.d("RevolverViewModel ${this@RevolverViewModel::class.simpleName} emitting effect ${effect::class.simpleName}")
                 _effect.emit(effect)
             }
         }
     }
 
     /**
-     * Calls the corresponding [EventHandler] for the added [Event]
+     * Calls the corresponding [EventHandler] for the added [RevolverEvent]
      */
     private suspend fun mapEvent(event: EVENT) {
-        Napier.d("ViewModel ${this@ViewModel::class.simpleName} received event ${event::class.simpleName}")
+        Napier.d("RevolverViewModel ${this@RevolverViewModel::class.simpleName} received event ${event::class.simpleName}")
         try {
             val handler = eventHandlers[event::class]
                 ?: throw IllegalStateException("the event $event was fired without a handler to handle it")
 
             handler(event, emitter)
         } catch (e: Throwable) {
-            Napier.w("Error caught in ViewModel ${this::class.simpleName}", e)
+            Napier.w("Error caught in RevolverViewModel ${this::class.simpleName}", e)
             mapException(e)
         }
     }
@@ -91,7 +91,7 @@ open class ViewModel<EVENT : Event, STATE : State, EFFECT : Effect>(
     }
 
     /**
-     * Adds an [ErrorHandler] to the list of handlers in this ViewModel. Only used internally in KMM.
+     * Adds an [ErrorHandler] to the list of handlers in this RevolverViewModel. Only used internally in KMM.
      * Each [Error] type can only have one handler.
      */
     @Suppress("UNCHECKED_CAST")
@@ -111,13 +111,13 @@ open class ViewModel<EVENT : Event, STATE : State, EFFECT : Effect>(
     }
 
     /**
-     * Registers an [EventHandler] in this ViewModel. Only used internally in KMM.
-     * Each [Event] type can only have one handler.
+     * Registers an [EventHandler] in this RevolverViewModel. Only used internally in KMM.
+     * Each [RevolverEvent] type can only have one handler.
      */
     @Suppress("UNCHECKED_CAST")
     inline fun <reified T : EVENT> addEventHandler(noinline handler: EventHandler<T, STATE, EFFECT>) {
         handler as? EventHandler<EVENT, STATE, EFFECT>
-            ?: throw IllegalArgumentException("Event type ${T::class::simpleName} must extend EVENT")
+            ?: throw IllegalArgumentException("RevolverEvent type ${T::class::simpleName} must extend EVENT")
         internalEventHandler(T::class, handler)
     }
 
@@ -130,7 +130,7 @@ open class ViewModel<EVENT : Event, STATE : State, EFFECT : Effect>(
     }
 
     /**
-     * Used by clients to emit a new event to the ViewModel
+     * Used by clients to emit a new event to the RevolverViewModel
      */
     override fun emit(event: EVENT) {
         val delivered = events.trySend(event).isSuccess

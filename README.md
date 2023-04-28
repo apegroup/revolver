@@ -207,7 +207,28 @@ internal class ExampleViewModelTests {
 ```
 as you can see we use Mockative to mock our repository, so we can purely focus on testing the viewmodel. Then we use Turbine to test the `viewmodel.state` (you can also test `viewmodel.effect`).
 
-<br><br/>
+## Using in your project
+to use this package in your kotlin multiplatform project you need to add our gradle server to you build.gradle.kts filte:
+```kotlin
+dependencyResolutionManagement {
+    repositories {
+        maven {
+            url = uri("https://maven.pkg.github.com/apegroup/")
+
+            credentials {
+                username = System.getenv("GH_USERNAME") ?: ""
+                password = System.getenv("GH_TOKEN") ?: ""
+            }
+        }
+    }
+}
+```
+Then you can import it in your commonMain just like any other Kotlin multiplatform package
+
+```kotlin
+implementation("con.umain:revolver:{LATEST_VERSION}")
+```
+
 ## Contribution
 
 This package is very much still in experimental mode and using this in a production environment is at your own risk. Bug reports, feature requests, or contributions are very much appreciated!
