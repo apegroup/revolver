@@ -20,7 +20,6 @@ version = libBaseVersion
 kotlin {
     android {
 
-        mavenPublication { artifactId = libBaseName }
         publishLibraryVariants("release", "debug")
         publishLibraryVariantsGroupedByFlavor = true
     }

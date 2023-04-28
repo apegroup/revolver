@@ -226,8 +226,9 @@ dependencyResolutionManagement {
 Then you can import it in your commonMain just like any other Kotlin multiplatform package
 
 ```kotlin
-implementation("con.umain:revolver:{LATEST_VERSION}")
+implementation("con.umain:shared:{LATEST_VERSION}")
 ```
+// TODO fix package naming
 
 ## Contribution
 
