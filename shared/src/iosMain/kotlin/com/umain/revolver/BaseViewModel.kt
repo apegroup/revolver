@@ -1,6 +1,5 @@
 package com.umain.revolver
 
-import com.umain.revolver.createViewModelScope
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancel
 
