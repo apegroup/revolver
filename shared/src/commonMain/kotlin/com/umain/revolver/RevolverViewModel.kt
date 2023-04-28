@@ -86,7 +86,7 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
         errorHandler?.invoke(e, emitter)
     }
 
-    inline fun <reified ERROR : Throwable> addErrorHandler(errorHandler: MviErrorHandler<STATE, EFFECT, ERROR>) {
+    inline fun <reified ERROR : Throwable> addErrorHandler(errorHandler: RevolverErrorHandler<STATE, EFFECT, ERROR>) {
         addErrorHandler(errorHandler::handleError)
     }
 

@@ -47,8 +47,8 @@ class Exception1 : Throwable()
 class Exception2 : Throwable()
 class Exception3 : Throwable()
 
-class DefaultMviErrorHandler<STATE, EFFECT>(val createGenericErrorState: (commonErrorState: CommonErrorRevolverState) -> STATE) :
-    MviErrorHandler<STATE, EFFECT, Throwable> {
+class DefaultRevolverErrorHandler<STATE, EFFECT>(val createGenericErrorState: (commonErrorState: CommonErrorRevolverState) -> STATE) :
+    RevolverErrorHandler<STATE, EFFECT, Throwable> {
     override suspend fun handleError(exception: Throwable, emit: Emitter<STATE, EFFECT>) {
         when (exception) {
             is Exception3 -> emit.state(createGenericErrorState(CommonErrorRevolverState.NoNetwork))
@@ -69,7 +69,7 @@ class MyRevolverViewModel : RevolverViewModel<MyRevolverEvent, MyRevolverState, 
 
         addErrorHandler { _: Exception1, emit -> emit.state(MyRevolverState.MyErrorRevolverState1) }
         addErrorHandler { _: Exception2, emit -> emit.state(MyRevolverState.MyErrorRevolverState2) }
-        addErrorHandler(DefaultMviErrorHandler { commonErrorState -> MyRevolverState.GenericErrorRevolverState(commonErrorState) })
+        addErrorHandler(DefaultRevolverErrorHandler { commonErrorState -> MyRevolverState.GenericErrorRevolverState(commonErrorState) })
     }
 
     private fun onFirstEvent(
