@@ -1,4 +1,3 @@
-
 buildscript {
     repositories {
         gradlePluginPortal()
@@ -7,13 +6,6 @@ buildscript {
     }
     dependencies {
         classpath(libs.android.gradlePlugin)
-    }
-}
-
-allprojects {
-    repositories {
-        google()
-        mavenCentral()
     }
 }
 

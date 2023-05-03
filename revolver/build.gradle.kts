@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
-
 plugins {
     kotlin("multiplatform") version "1.8.0"
     id("com.android.library")
@@ -19,7 +17,6 @@ version = libBaseVersion
 
 kotlin {
     android {
-
         publishLibraryVariants("release", "debug")
         publishLibraryVariantsGroupedByFlavor = true
     }
