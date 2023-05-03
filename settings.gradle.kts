@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 pluginManagement {
     repositories {
         google()
@@ -5,6 +7,15 @@ pluginManagement {
         mavenCentral()
     }
 }
+rootProject.name = "revolver-root"
+include(":revolver")
 
-rootProject.name = "revolver"
-include(":shared")
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        google()
+        mavenLocal()
+    }
+}

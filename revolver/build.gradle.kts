@@ -1,4 +1,4 @@
-import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinNativeTarget
+@file:Suppress("UnstableApiUsage")
 
 plugins {
     kotlin("multiplatform") version "1.8.0"
@@ -8,9 +8,6 @@ plugins {
 
 /* Library Specs */
 val libAndroidNamespace: String by project
-val libDeveloperOrg: String by project
-val libMavenPublish: String by project
-val libBaseName: String by project
 val libBaseGroup: String by project
 val libBaseVersion: String by project
 
@@ -19,7 +16,6 @@ version = libBaseVersion
 
 kotlin {
     android {
-
         publishLibraryVariants("release", "debug")
         publishLibraryVariantsGroupedByFlavor = true
     }
@@ -91,10 +87,12 @@ publishing {
 }
 
 android {
-    compileSdk = 30
+    namespace = libAndroidNamespace
+    compileSdk = findProperty("android.compileSdk").toString().toInt()
+
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
-        minSdk = 21
-        targetSdk = 30
+        minSdk = findProperty("android.minSdk").toString().toInt()
+        targetSdk = findProperty("android.targetSdk").toString().toInt()
     }
 }
