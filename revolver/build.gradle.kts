@@ -8,8 +8,6 @@ plugins {
 
 /* Library Specs */
 val libAndroidNamespace: String by project
-val libDeveloperOrg: String by project
-val libMavenPublish: String by project
 val libBaseGroup: String by project
 val libBaseVersion: String by project
 
@@ -90,10 +88,11 @@ publishing {
 
 android {
     namespace = libAndroidNamespace
-    compileSdk = 33
+    compileSdk = findProperty("android.compileSdk").toString().toInt()
+
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
-        minSdk = 21
-        targetSdk = 33
+        minSdk = findProperty("android.minSdk").toString().toInt()
+        targetSdk = findProperty("android.targetSdk").toString().toInt()
     }
 }
