@@ -1,3 +1,5 @@
+@file:Suppress("UnstableApiUsage")
+
 plugins {
     kotlin("multiplatform") version "1.8.0"
     id("com.android.library")
@@ -8,7 +10,6 @@ plugins {
 val libAndroidNamespace: String by project
 val libDeveloperOrg: String by project
 val libMavenPublish: String by project
-val libBaseName: String by project
 val libBaseGroup: String by project
 val libBaseVersion: String by project
 
@@ -88,10 +89,11 @@ publishing {
 }
 
 android {
-    compileSdk = 30
+    namespace = libAndroidNamespace
+    compileSdk = 33
     sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
     defaultConfig {
         minSdk = 21
-        targetSdk = 30
+        targetSdk = 33
     }
 }
