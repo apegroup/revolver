@@ -101,16 +101,16 @@ To do this Revolver supports reusable error handling classes. If you don't want 
 class ExampleViewModel : ViewModel<ExampleEvent, ExampleState, ExampleEffect>(ExampleState.Loading) {
 
     init {
-        addErrorHandler(MviDefaultErrorHandler(ExampleState.Error))
+        addErrorHandler(RevolverDefaultErrorHandler(ExampleState.Error))
     }
 }
 ```
 
 this will result in any exception thrown to emit an `ExampleState.Error`.
 
-ofcourse you can implement your own `MviErrorHandler` to do more complex state mapping.
+ofcourse you can implement your own `RevolverErrorHandler` to do more complex state mapping.
 ```kotlin
-class ExampleErrorHandler<STATE, EFFECT> : MviErrorHandler<STATE, EFFECT, Throwable> {
+class ExampleErrorHandler<STATE, EFFECT> : RevolverErrorHandler<STATE, EFFECT, Throwable> {
 
     override suspend fun handleError(exception: Throwable, emit: Emitter<STATE, EFFECT>) {
         // log error, call some other external methods, map to reusable states ...
@@ -228,7 +228,6 @@ Then you can import it in your commonMain just like any other Kotlin multiplatfo
 ```kotlin
 implementation("con.umain:shared:{LATEST_VERSION}")
 ```
-// TODO fix package naming
 
 ## Contribution
 
