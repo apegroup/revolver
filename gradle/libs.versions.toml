@@ -7,7 +7,7 @@ ktlint = "0.48.2"
 koin = "3.2.2"
 mockative = "1.4.1"
 napier = "2.6.1"
-turbine = "0.12.1"
+turbine = "1.0.0"
 
 [libraries]
 # android
