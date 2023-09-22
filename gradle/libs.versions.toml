@@ -1,7 +1,7 @@
 [versions]
 android-gradle-plugin = "7.3.1"
 androidxLifecycleViewModel = "2.5.1"
-coroutines = "1.6.4"
+coroutines = "1.7.3"
 kotlin-gradle-plugin = "1.8.0"
 ktlint = "0.48.2"
 koin = "3.2.2"
