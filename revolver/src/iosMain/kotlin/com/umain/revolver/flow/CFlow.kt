@@ -3,7 +3,6 @@ package com.umain.revolver.flow
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collect
@@ -12,6 +11,7 @@ import kotlinx.coroutines.launch
 
 actual open class CFlow<out T : Any> actual constructor(
     private val flow: Flow<T>,
+    private val coroutineScope: CoroutineScope,
 ) : Flow<T> by flow {
 
     private fun watch(
@@ -28,9 +28,8 @@ actual open class CFlow<out T : Any> actual constructor(
     }
 
     fun watch(onNext: (T) -> Unit): DisposableHandle {
-        @Suppress("OPT_IN_USAGE")
         return watch(
-            coroutineScope = GlobalScope,
+            coroutineScope = coroutineScope,
             dispatcher = Dispatchers.Main,
             onNext = onNext,
         )

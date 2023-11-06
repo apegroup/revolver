@@ -40,12 +40,12 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
     /**
      * StateFlow for observing state changes
      */
-    override val state = _state.cStateFlow()
+    override val state = _state.cStateFlow(viewModelScope)
 
     /**
      * SharedFlow for observing side effects. Used for one of events like "Move to the next screen"
      */
-    override val effect = _effect.cSharedFlow()
+    override val effect = _effect.cSharedFlow(viewModelScope)
 
     private val emitter: Emitter<STATE, EFFECT> = object : Emitter<STATE, EFFECT> {
         override val state: StateEmitter<STATE> = { state: STATE ->
