@@ -49,10 +49,8 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
 
     private val emitter: Emitter<STATE, EFFECT> = object : Emitter<STATE, EFFECT> {
         override val state: StateEmitter<STATE> = { state: STATE ->
-            viewModelScope.launch {
-                Napier.d("RevolverViewModel ${this@RevolverViewModel::class.simpleName} emitting state ${state::class.simpleName}")
-                _state.emit(state)
-            }
+            Napier.d("RevolverViewModel ${this@RevolverViewModel::class.simpleName} emitting state ${state::class.simpleName}")
+            _state.value = state
         }
         override val effect: EffectEmitter<EFFECT> = { effect: EFFECT ->
             viewModelScope.launch {
