@@ -79,8 +79,8 @@ publishing {
             setUrl("https://maven.pkg.github.com/apegroup/revolver")
             name = "GitHubPackages"
             credentials {
-                username = System.getenv("APEGROUPCI_USERNAME") ?: properties["GH_USERNAME"]?.toString()
-                password = System.getenv("APEGROUPCI_TOKEN") ?: properties["GH_TOKEN"]?.toString()
+                username = System.getenv("GH_USERNAME") ?: properties["GH_USERNAME"]?.toString()
+                password = System.getenv("GH_TOKEN") ?: properties["GH_TOKEN"]?.toString()
             }
         }
     }

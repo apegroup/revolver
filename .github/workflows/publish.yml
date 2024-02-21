@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 env:
-  APEGROUPCI_USERNAME: ${{ secrets.APEGROUPCI_USERNAME }}
-  APEGROUPCI_TOKEN: ${{ secrets.APEGROUPCI_TOKEN }}
+  GH_USERNAME: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_TOKEN }}
+  GH_TOKEN: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_USERNAME }}
 
 jobs:
   publish:
