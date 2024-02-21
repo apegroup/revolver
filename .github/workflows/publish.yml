@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
 
 env:
-  GH_USERNAME: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_TOKEN }}
-  GH_TOKEN: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_USERNAME }}
+  GH_USERNAME: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_USERNAME }}
+  GH_TOKEN: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_TOKEN }}
 
 jobs:
   publish:
