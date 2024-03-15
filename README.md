@@ -18,10 +18,12 @@ sealed class ExampleEvent : Event {
 
 ```Kotlin
 sealed class ExampleState : State {
-    object Loading : ExampleState()
+    class Loading : ExampleState()
     data class Loaded(val result: String) : ExampleState()
 }
 ```
+Avoid using `object` for sealed classes it might cause problems with state updates.
+
 ```Kotlin
 sealed class ExampleEffect : Effect {
     data class ShowToast(val message: String) : ExampleEffect()
