@@ -9,6 +9,8 @@ buildscript {
     }
 }
 
-tasks.register("clean", Delete::class) {
-    delete(rootProject.buildDir)
+tasks.register<Delete>("clean") {
+    description = "Clean project build directory"
+    group = JavaBasePlugin.BUILD_TASK_NAME
+    delete(project.layout.buildDirectory)
 }
