@@ -1,7 +1,7 @@
 @file:Suppress("UnstableApiUsage")
 
 plugins {
-    kotlin("multiplatform") version "1.8.0"
+    kotlin("multiplatform") version "1.9.23"
     id("com.android.library")
     id("maven-publish")
 }
@@ -15,60 +15,26 @@ group = libBaseGroup
 version = libBaseVersion
 
 kotlin {
-    android {
-        publishLibraryVariants("release", "debug")
-        publishLibraryVariantsGroupedByFlavor = true
+    androidTarget {
+        publishLibraryVariants("release")
     }
-    iosX64()
+    jvmToolchain(17)
     iosArm64()
+    iosX64()
     iosSimulatorArm64()
 
-
     sourceSets {
-        val commonMain by getting {
-            dependencies {
-                implementation(libs.coroutines.core)
-                implementation(libs.napier)
-            }
-        }
-        val commonTest by getting {
-            dependencies {
-                implementation(libs.bundles.testDependencies)
-            }
-        }
-        val androidMain by getting {
-            dependencies {
-                implementation(libs.androidx.lifecycle.viewmodel)
-            }
+        commonMain.dependencies {
+            implementation(libs.coroutines.core)
+            implementation(libs.napier)
         }
 
-        val iosArm64Main by getting
-        val iosSimulatorArm64Main by getting
-        val iosX64Main by getting
-
-        val iosMain by creating {
-            dependsOn(commonMain)
+        commonTest.dependencies {
+            implementation(libs.bundles.testDependencies)
         }
 
-        val iosDeviceMain by creating {
-            dependsOn(iosMain)
-            iosArm64Main.dependsOn(this)
-        }
-
-        val iosSimulatorMain by creating {
-            dependsOn(iosMain)
-            iosSimulatorArm64Main.dependsOn(this)
-            iosX64Main.dependsOn(this)
-        }
-
-        val iosX64Test by getting
-        val iosArm64Test by getting
-        val iosSimulatorArm64Test by getting
-        val iosTest by creating {
-            dependsOn(commonTest)
-            iosX64Test.dependsOn(this)
-            iosArm64Test.dependsOn(this)
-            iosSimulatorArm64Test.dependsOn(this)
+        androidMain.dependencies {
+            implementation(libs.androidx.lifecycle.viewmodel)
         }
     }
 }
