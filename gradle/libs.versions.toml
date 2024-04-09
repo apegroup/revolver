@@ -5,7 +5,7 @@ coroutines = "1.8.0"
 ktlint = "1.1.1"
 koin = "3.5.3"
 mockative = "2.0.1"
-napier = "2.6.1"
+napier = "2.7.1"
 turbine = "1.0.0"
 
 # Idea does not show actual use of the library, so be careful with dependency removal
