@@ -8,8 +8,8 @@ on:
       - '[0-9]+.[0-9]+.[0-9]+-[a-z]+[0-9]+'
 
 env:
-  GH_USERNAME: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_USERNAME }}
-  GH_TOKEN: ${{ secrets.MCD_OPEN_SOURCE_REPOSITORY_CI_TOKEN }}
+  GH_USERNAME: ${{ secrets.REVOLVER_CI_USERNAME }}
+  GH_TOKEN: ${{ secrets.REVOLVER_REPOSITORY_CI_TOKEN }}
 
 jobs:
   publish:
