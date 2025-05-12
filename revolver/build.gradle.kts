@@ -1,8 +1,8 @@
 @file:Suppress("UnstableApiUsage")
 
 plugins {
-    kotlin("multiplatform") version "2.0.20"
-    id("com.android.library")
+    alias(libs.plugins.multiplatform)
+    alias(libs.plugins.agp)
     id("maven-publish")
 }
 
@@ -15,26 +15,33 @@ group = libBaseGroup
 version = libBaseVersion
 
 kotlin {
-    androidTarget {
-        publishLibraryVariants("release")
+    androidLibrary {
+        namespace = libAndroidNamespace
+        compileSdk = findProperty("android.compileSdk").toString().toInt()
+        minSdk = findProperty("android.minSdk").toString().toInt()
     }
+
     jvmToolchain(17)
     iosArm64()
     iosX64()
     iosSimulatorArm64()
 
     sourceSets {
-        commonMain.dependencies {
-            implementation(libs.coroutines.core)
-            implementation(libs.napier)
+        commonMain {
+            dependencies {
+                implementation(libs.coroutines.core)
+                implementation(libs.napier)
+            }
         }
-
-        commonTest.dependencies {
-            implementation(libs.bundles.testDependencies)
+        commonTest {
+            dependencies {
+                implementation(libs.bundles.testDependencies)
+            }
         }
-
-        androidMain.dependencies {
-            api(libs.androidx.lifecycle.viewmodel)
+        androidMain {
+            dependencies {
+                api(libs.androidx.lifecycle.viewmodel)
+            }
         }
     }
 }
@@ -49,16 +56,5 @@ publishing {
                 password = System.getenv("GH_TOKEN") ?: properties["GH_TOKEN"]?.toString()
             }
         }
-    }
-}
-
-android {
-    namespace = libAndroidNamespace
-    compileSdk = findProperty("android.compileSdk").toString().toInt()
-
-    sourceSets["main"].manifest.srcFile("src/androidMain/AndroidManifest.xml")
-    defaultConfig {
-        minSdk = findProperty("android.minSdk").toString().toInt()
-        targetSdk = findProperty("android.targetSdk").toString().toInt()
     }
 }
