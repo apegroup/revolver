@@ -1,11 +1,13 @@
+plugins{
+    alias { libs.plugins.multiplatform } apply false
+    alias { libs.plugins.agp } apply false
+}
+
 buildscript {
     repositories {
         gradlePluginPortal()
         google()
         mavenCentral()
-    }
-    dependencies {
-        classpath(libs.android.gradlePlugin)
     }
 }
 
