@@ -1,7 +1,7 @@
 [versions]
 android-gradle-plugin = "8.7.0"
 androidxLifecycleViewModel = "2.9.0"
-coroutines = "1.9.0"
+coroutines = "1.10.2"
 ktlint = "1.1.1"
 koin = "3.5.6"
 mockative = "2.1.0"
