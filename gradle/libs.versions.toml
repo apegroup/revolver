@@ -6,7 +6,7 @@ ktlint = "1.1.1"
 koin = "3.5.6"
 mockative = "2.1.0"
 napier = "2.7.1"
-turbine = "1.1.0"
+turbine = "1.2.0"
 kotlin = "2.0.20"
 
 # Idea does not show actual use of the library, so be careful with dependency removal
