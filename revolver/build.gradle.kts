@@ -21,7 +21,7 @@ kotlin {
         minSdk = findProperty("android.minSdk").toString().toInt()
     }
 
-    jvmToolchain(17)
+    jvmToolchain(21)
     iosArm64()
     iosX64()
     iosSimulatorArm64()
