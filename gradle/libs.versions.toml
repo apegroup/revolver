@@ -7,7 +7,7 @@ koin = "4.1.1"
 mockative = "3.1.0"
 napier = "2.7.1"
 turbine = "1.2.1"
-kotlin = "2.3.0"
+kotlin = "2.3.10"
 
 # Idea does not show actual use of the library, so be careful with dependency removal
 [libraries]
