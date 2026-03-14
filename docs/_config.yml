@@ -1,0 +1,5 @@
+title: Revolver
+description: Immutable event-based state management framework for Kotlin Multiplatform.
+theme: jekyll-theme-cayman
+show_downloads: true
+google_analytics:
