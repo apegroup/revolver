@@ -1,3 +1,10 @@
+---
+layout: default
+title: Error Handling
+nav_order: 4
+description: "Registering error handlers and building reusable error strategies."
+---
+
 # Error Handling
 
 All exceptions that escape an `EventHandler` are automatically caught by `RevolverViewModel` and routed to a registered `ErrorHandler`. This keeps Kotlin exceptions from propagating to platform clients as unhandled crashes.
