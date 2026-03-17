@@ -1,17 +1,21 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
 }
 
+val jdkVersion = findProperty("jdkVersion").toString()
+
 android {
     namespace = "com.umain.advancedandroidintegration"
-    compileSdk = 35
+    compileSdk = findProperty("android.compileSdk").toString().toInt()
 
     defaultConfig {
         applicationId = "com.umain.advancedandroidintegration"
-        minSdk = 29
-        targetSdk = 35
+        minSdk = findProperty("android.minSdk").toString().toInt()
+        targetSdk = findProperty("android.targetSdk").toString().toInt()
         versionCode = 1
         versionName = "1.0"
     }
@@ -23,12 +27,14 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_21
-        targetCompatibility = JavaVersion.VERSION_21
+        sourceCompatibility = JavaVersion.toVersion(jdkVersion)
+        targetCompatibility = JavaVersion.toVersion(jdkVersion)
     }
 
-    kotlinOptions {
-        jvmTarget = "21"
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.fromTarget(jdkVersion))
+        }
     }
 
     buildFeatures {
