@@ -31,6 +31,22 @@ actual open class CFlow<out T : Any> actual constructor(
         }
     }
 
+    /**
+     * Subscribes to this flow from Swift. Each emitted value is delivered to [onNext] on the
+     * main dispatcher. Returns a [DisposableHandle] that **must** be cancelled when the
+     * observer is no longer needed (typically in `deinit`).
+     *
+     * ```swift
+     * let handle = viewModel.state.watch { state in
+     *     self.updateUI(state: state)
+     * }
+     * // later:
+     * handle.dispose()
+     * ```
+     *
+     * @param onNext called on the main thread for each emitted value.
+     * @return a [DisposableHandle] that cancels the underlying coroutine when disposed.
+     */
     fun watch(onNext: (T) -> Unit): DisposableHandle {
         return watch(
             coroutineScope = coroutineScope,

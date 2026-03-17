@@ -1,25 +1,42 @@
 package com.umain.revolver
 
+/** Callback type used by [Emitter] to deliver a new [STATE] value. */
 typealias StateEmitter<STATE> = (state: STATE) -> Unit
+
+/** Callback type used by [Emitter] to deliver a one-shot [EFFECT] value. */
 typealias EffectEmitter<EFFECT> = (effect: EFFECT) -> Unit
 
 /**
- * Used internally in the event handlers in ViewModels to emit new states or effects
+ * Passed to every [EventHandler] and [ErrorHandler] so they can push new states and effects
+ * without holding a direct reference to the ViewModel internals.
+ *
+ * @param STATE the [RevolverState] type for this ViewModel.
+ * @param EFFECT the [RevolverEffect] type for this ViewModel.
  */
 interface Emitter<STATE, EFFECT> {
+    /** Emits a new [STATE], immediately replacing the current value in the StateFlow. */
     val state: StateEmitter<STATE>
+
+    /** Emits a one-shot [EFFECT] to the SharedFlow. Collected once per active subscriber. */
     val effect: EffectEmitter<EFFECT>
 }
 
 /**
- * The method signature for an event handler in a RevolverViewModel.
+ * Suspend function type for handling a specific [EVENT] subtype inside a [RevolverViewModel].
+ * Registered via [RevolverViewModel.addEventHandler].
  *
- * Example event handler:
- * ```
- * private fun onSubmitted(
- *     event: MarketPickerEvent.Submitted,
- *     emit: MarketPickerEmitter,
- * ) { ... }
+ * Each event type may have at most one handler. The handler receives the typed event and an
+ * [Emitter] for producing state and effect updates.
+ *
+ * Example:
+ * ```kotlin
+ * private suspend fun onRefresh(
+ *     event: ExampleEvent.Refresh,
+ *     emit: Emitter<ExampleState, ExampleEffect>,
+ * ) {
+ *     emit.state(ExampleState.Loading)
+ *     emit.state(ExampleState.Loaded(fetchData()))
+ * }
  * ```
  */
 typealias EventHandler<EVENT, STATE, EFFECT> = suspend (
@@ -27,26 +44,60 @@ typealias EventHandler<EVENT, STATE, EFFECT> = suspend (
     emit: Emitter<STATE, EFFECT>,
 ) -> Unit
 
+/**
+ * Suspend function type for handling a specific [ERROR] subtype inside a [RevolverViewModel].
+ * Registered via [RevolverViewModel.addErrorHandler].
+ *
+ * Handlers are matched in registration order — register more specific exception types before
+ * generic ones.
+ */
 typealias ErrorHandler<ERROR, STATE, EFFECT> = suspend (
     exception: ERROR,
     emit: Emitter<STATE, EFFECT>,
 ) -> Unit
 
 /**
- * Emitted by the clients to the KMM RevolverViewModel when something has happened that needs to be handled.
- * E.g. User selected the language in the market selector
+ * Marker interface for all events sent from clients to a [RevolverViewModel].
+ *
+ * Implement with a sealed class to enumerate every action the ViewModel can handle:
+ * ```kotlin
+ * sealed class ExampleEvent : RevolverEvent {
+ *     object Refresh : ExampleEvent()
+ *     data class Search(val query: String) : ExampleEvent()
+ * }
+ * ```
  */
 interface RevolverEvent
 
 /**
- * Emitted by KMM to the clients and describes the view that should be shown by the clients.
- * E.g. A list of markets to show in the market picker
+ * Marker interface for all immutable view states emitted by a [RevolverViewModel].
+ *
+ * Implement with a sealed class. Prefer `object` for states without data and `data class`
+ * for states that carry payloads — plain `class` can suppress emissions when the value does
+ * not structurally change.
+ *
+ * ```kotlin
+ * sealed class ExampleState : RevolverState {
+ *     object Loading : ExampleState()
+ *     data class Loaded(val items: List<String>) : ExampleState()
+ *     data class Error(val message: String) : ExampleState()
+ * }
+ * ```
  */
 interface RevolverState
 
 /**
- * Emitted by KMM to the clients to inform them that something has happened which they need to handle.
- * E.g. KMM has completed app initialization, splash screen can be dismissed.
+ * Marker interface for one-shot side effects emitted by a [RevolverViewModel].
+ *
+ * Effects are delivered via a SharedFlow and consumed once per subscriber. Use them for
+ * actions that must not be replayed on resubscription, such as navigation or toasts.
+ *
+ * ```kotlin
+ * sealed class ExampleEffect : RevolverEffect {
+ *     data class ShowToast(val message: String) : ExampleEffect()
+ *     data class NavigateTo(val route: String) : ExampleEffect()
+ * }
+ * ```
  */
 interface RevolverEffect
 
