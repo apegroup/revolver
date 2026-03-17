@@ -13,13 +13,32 @@ import kotlinx.coroutines.launch
 import kotlin.reflect.KClass
 
 /**
- * Extendable class for implementing custom ViewModels. requires types
- * for its RevolverEvent, RevolverState, and RevolverEffect implementations e.g.
- * ```
+ * Base class for all Revolver ViewModels. Extend this class, parameterise it with your sealed
+ * [RevolverEvent], [RevolverState], and [RevolverEffect] types, then register handlers in `init`.
+ *
+ * ```kotlin
  * class ExampleViewModel : RevolverViewModel<ExampleEvent, ExampleState, ExampleEffect>(
- *    initialState: ExampleState.SomeState
- * )
+ *     initialState = ExampleState.Loading,
+ * ) {
+ *     init {
+ *         addEventHandler<ExampleEvent.Refresh>(::onRefresh)
+ *         addErrorHandler(RevolverDefaultErrorHandler(ExampleState.Error("Oops")))
+ *     }
+ *
+ *     private suspend fun onRefresh(
+ *         event: ExampleEvent.Refresh,
+ *         emit: Emitter<ExampleState, ExampleEffect>,
+ *     ) {
+ *         emit.state(ExampleState.Loading)
+ *         emit.state(ExampleState.Loaded(fetchData()))
+ *     }
+ * }
  * ```
+ *
+ * @param EVENT sealed class implementing [RevolverEvent].
+ * @param STATE sealed class implementing [RevolverState].
+ * @param EFFECT sealed class implementing [RevolverEffect].
+ * @param initialState the state exposed by [state] before any event is processed.
  */
 open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFECT : RevolverEffect>(
     initialState: STATE,
@@ -38,12 +57,14 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
     private val _effect = MutableSharedFlow<EFFECT>()
 
     /**
-     * StateFlow for observing state changes
+     * The current view state. Always holds the last emitted [STATE] value.
+     * Clients should collect this flow to drive their UI.
      */
     override val state = _state.cStateFlow(viewModelScope)
 
     /**
-     * SharedFlow for observing side effects. Used for one of events like "Move to the next screen"
+     * One-shot side effects such as navigation or toasts. Each effect is delivered once per
+     * active subscriber and is not replayed to late collectors.
      */
     override val effect = _effect.cSharedFlow(viewModelScope)
 
@@ -60,9 +81,7 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
         }
     }
 
-    /**
-     * Calls the corresponding [EventHandler] for the added [RevolverEvent]
-     */
+    /** Routes an incoming [event] to its registered [EventHandler], or throws if none exists. */
     private suspend fun mapEvent(event: EVENT) {
         Napier.d("RevolverViewModel ${this@RevolverViewModel::class.simpleName} received event ${event::class.simpleName}")
         try {
@@ -84,13 +103,26 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
         errorHandler?.invoke(e, emitter)
     }
 
+    /**
+     * Registers a [RevolverErrorHandler] instance for exception type [ERROR].
+     * Delegates to [addErrorHandler] with the handler's [RevolverErrorHandler.handleError] function.
+     *
+     * @param ERROR the exception type this handler responds to.
+     * @param errorHandler the reusable handler implementation.
+     */
     inline fun <reified ERROR : Throwable> addErrorHandler(errorHandler: RevolverErrorHandler<STATE, EFFECT, ERROR>) {
         addErrorHandler(errorHandler::handleError)
     }
 
     /**
-     * Adds an [ErrorHandler] to the list of handlers in this RevolverViewModel. Only used internally in KMM.
-     * Each [Error] type can only have one handler.
+     * Registers a suspend lambda as an [ErrorHandler] for exception type [ERROR].
+     *
+     * Handlers are matched in registration order — register more specific types before broader ones.
+     * Each exception type may have at most one handler.
+     *
+     * @param ERROR the exception type this handler responds to; must extend [Throwable].
+     * @param handler the suspend function that receives the exception and an [Emitter].
+     * @throws IllegalStateException if a handler for [ERROR] is already registered.
      */
     @Suppress("UNCHECKED_CAST")
     inline fun <reified ERROR : Throwable> addErrorHandler(noinline handler: ErrorHandler<ERROR, STATE, EFFECT>) {
@@ -100,6 +132,7 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
         internalErrorHandler(ERROR::class, handler)
     }
 
+    /** @suppress Internal use only. */
     fun internalErrorHandler(type: KClass<*>, handler: EventHandler<Throwable, STATE, EFFECT>) {
         if (eventHandlers.containsKey(type)) {
             throw IllegalStateException("only one ErrorHandler can be registered for $type")
@@ -109,8 +142,20 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
     }
 
     /**
-     * Registers an [EventHandler] in this RevolverViewModel. Only used internally in KMM.
-     * Each [RevolverEvent] type can only have one handler.
+     * Registers a suspend lambda as an [EventHandler] for event type [T].
+     *
+     * Call this in the ViewModel's `init` block to wire up each event subtype to its handler.
+     * Each event type may have at most one handler.
+     *
+     * ```kotlin
+     * init {
+     *     addEventHandler<ExampleEvent.Refresh>(::onRefresh)
+     * }
+     * ```
+     *
+     * @param T the [RevolverEvent] subtype this handler responds to.
+     * @param handler the suspend function that receives the event and an [Emitter].
+     * @throws IllegalStateException if a handler for [T] is already registered.
      */
     @Suppress("UNCHECKED_CAST")
     inline fun <reified T : EVENT> addEventHandler(noinline handler: EventHandler<T, STATE, EFFECT>) {
@@ -119,6 +164,7 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
         internalEventHandler(T::class, handler)
     }
 
+    /** @suppress Internal use only. */
     fun internalEventHandler(type: KClass<*>, handler: EventHandler<EVENT, STATE, EFFECT>) {
         if (eventHandlers.containsKey(type)) {
             throw IllegalStateException("only one EventHandler can be registered for $type")
@@ -128,7 +174,10 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
     }
 
     /**
-     * Used by clients to emit a new event to the RevolverViewModel
+     * Sends an [event] to the ViewModel for processing. The corresponding [EventHandler] will be
+     * invoked asynchronously on the ViewModel's coroutine scope.
+     *
+     * @throws IllegalStateException if the internal event channel cannot accept the event.
      */
     override fun emit(event: EVENT) {
         val delivered = events.trySend(event).isSuccess
