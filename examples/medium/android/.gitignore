@@ -14,3 +14,12 @@ app/build/
 .externalNativeBuild
 .cxx
 local.properties
+.idea
+local.properties
+.DS_Store
+build/
+captures/
+.externalNativeBuild
+.cxx
+*.keystore
+!debug.keystore
