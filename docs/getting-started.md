@@ -1,3 +1,10 @@
+---
+layout: default
+title: Getting Started
+nav_order: 2
+description: "Installation and your first Revolver ViewModel."
+---
+
 # Getting Started
 
 ## Installation

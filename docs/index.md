@@ -1,3 +1,10 @@
+---
+layout: default
+title: Home
+nav_order: 1
+description: "Immutable event-based state management for Kotlin Multiplatform."
+---
+
 # Revolver Documentation
 
 Revolver is an immutable, event-based state management framework for Kotlin Multiplatform. It enforces unidirectional data flow and a single source of truth for application state.

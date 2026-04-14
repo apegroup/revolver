@@ -1,3 +1,10 @@
+---
+layout: default
+title: iOS Integration
+nav_order: 6
+description: "Observing Kotlin flows from Swift using CStateFlow, CSharedFlow, and DisposableHandle."
+---
+
 # iOS Integration
 
 Revolver targets iOS via Kotlin Multiplatform. The shared library compiles to a native framework that can be consumed from Swift. This guide covers the Swift-side integration patterns.
