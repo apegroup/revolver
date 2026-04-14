@@ -1,34 +1,30 @@
 <p align="center"><img src="https://raw.githubusercontent.com/apegroup/revolver/main/assets/logo.svg" width="150"/></p>
-<h1 align="center">Revolver</h1>
-<p align="center">Immutable event-based state management for Kotlin Multiplatform</p>
+<h1 align="center"> Revolver</h1>
+<p align="center"> Immutable event-based state management framework for Kotlin Multiplatform.</p>
 
-<br/>
+<p align="center">
+  <img src="https://img.shields.io/badge/Kotlin-2.3.20--RC3-blue.svg?style=flat&logo=kotlin" alt="Kotlin version">
+  <img src="https://img.shields.io/badge/Platform-KMP-orange.svg?style=flat" alt="Platform KMP">
+</p>
 
-## Overview
+Revolver is a lightweight, predictable state management library for Kotlin Multiplatform (KMP). It enforces a unidirectional data flow with a single immutable state, making your UI logic easier to reason about, test, and share across Android, iOS, and beyond.
 
-Revolver is a Kotlin Multiplatform state management library that enforces a single immutable state and unidirectional data flow. Clients send **Events** to a **ViewModel**, which processes them and emits **States** and **Effects** back via Kotlin Flows.
+---
 
-```
-Client ──emit(Event)──► RevolverViewModel ──► EventHandler
-                                                    │
-                              ┌─────────────────────┤
-                              ▼                     ▼
-                        StateFlow<State>    SharedFlow<Effect>
-                              │                     │
-                              └──────────► Clients ◄┘
-```
+## 🚀 Key Features
 
-| Type | Direction | Purpose |
-|---|---|---|
-| `RevolverEvent` | Client → ViewModel | User actions or lifecycle triggers |
-| `RevolverState` | ViewModel → Client | Immutable snapshot of what to display |
-| `RevolverEffect` | ViewModel → Client | One-shot side effect (navigation, toast, etc.) |
+- **Single Source of Truth:** One immutable state per ViewModel.
+- **Event-Driven:** Clear separation between UI actions (Events) and business logic.
+- **Side Effects Handling:** Dedicated stream for one-time effects (navigation, toasts, etc.).
+- **Built-in Error Handling:** Seamlessly map exceptions to UI states.
+- **Platform Agnostic:** Core logic stays in `commonMain`, with native integrations for Android and iOS.
+- **Testable:** Designed for easy unit testing of the entire state machine.
 
-<br/>
+---
 
-## Installation
+## 📦 Installation
 
-Add the GitHub Packages Maven repository to your `settings.gradle.kts`:
+Revolver is hosted on GitHub Packages. Add the following to your `settings.gradle.kts` or `build.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
@@ -44,245 +40,119 @@ dependencyResolutionManagement {
 }
 ```
 
-Then declare the dependency in your `commonMain` source set:
+Then, add the dependency to your `commonMain` source set:
 
 ```kotlin
-implementation("com.umain:revolver:1.6.0")
+implementation("com.umain:revolver:{LATEST_VERSION}")
 ```
 
-<br/>
+---
 
-## Quick Start
+## 🛠️ How it Works
 
-### 1. Define your sealed classes
+Revolver follows a simple **Event -> ViewModel -> State/Effect** flow.
+
+### 1. Define your Contract
 
 ```kotlin
-sealed class ExampleEvent : RevolverEvent {
-    object Refresh : ExampleEvent()
+// 1. Events (User/UI actions)
+sealed class MainEvent : RevolverEvent {
+    object Refresh : MainEvent()
 }
 
-sealed class ExampleState : RevolverState {
-    object Loading : ExampleState()
-    data class Loaded(val result: String) : ExampleState()
-    data class Error(val message: String) : ExampleState()
+// 2. State (What the UI shows)
+sealed class MainState : RevolverState {
+    object Loading : MainState()
+    data class Success(val data: String) : MainState()
+    data class Error(val message: String) : MainState()
 }
 
-sealed class ExampleEffect : RevolverEffect {
-    data class ShowToast(val message: String) : ExampleEffect()
+// 3. Effects (One-time actions)
+sealed class MainEffect : RevolverEffect {
+    data class ShowToast(val text: String) : MainEffect()
 }
 ```
 
-> Prefer `object` for states with no data and `data class` for states that carry data. Avoid plain `class` for states — it can prevent state updates from being emitted when the value does not change.
-
-### 2. Implement your ViewModel
+### 2. Implement the ViewModel
 
 ```kotlin
-class ExampleViewModel : RevolverViewModel<ExampleEvent, ExampleState, ExampleEffect>(
-    initialState = ExampleState.Loading,
+class MainViewModel : RevolverViewModel<MainEvent, MainState, MainEffect>(
+    initialState = MainState.Loading
 ) {
-
     init {
-        addEventHandler<ExampleEvent.Refresh>(::onRefresh)
-        addErrorHandler(RevolverDefaultErrorHandler(ExampleState.Error("Something went wrong")))
+        addEventHandler<MainEvent.Refresh>(::onRefresh)
+        addErrorHandler<Exception> { _, emit -> emit.state(MainState.Error("Something went wrong")) }
     }
 
-    private suspend fun onRefresh(
-        event: ExampleEvent.Refresh,
-        emit: Emitter<ExampleState, ExampleEffect>,
-    ) {
-        emit.state(ExampleState.Loading)
-        val data = fetchData()
-        emit.state(ExampleState.Loaded(data))
-        emit.effect(ExampleEffect.ShowToast("Loaded!"))
+    private suspend fun onRefresh(event: MainEvent.Refresh, emit: Emitter<MainState, MainEffect>) {
+        emit.state(MainState.Loading)
+        val result = fetchData() // Your logic here
+        emit.state(MainState.Success(result))
     }
 }
 ```
 
-### 3. Collect state and effects (Android — Jetpack Compose)
+---
 
-```kotlin
-@Composable
-fun ExampleScreen(viewModel: ExampleViewModel) {
-    val state by viewModel.state.collectAsState()
+## 📱 Platform Usage
 
-    LaunchedEffect(Unit) {
-        viewModel.effect.collect { effect ->
-            when (effect) {
-                is ExampleEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
+### Android
+Revolver integrates directly with `androidx.lifecycle.ViewModel`. Use it as you would any other ViewModel.
 
-    viewModel.emit(ExampleEvent.Refresh)
-
-    when (val s = state) {
-        is ExampleState.Loading -> CircularProgressIndicator()
-        is ExampleState.Loaded  -> Text(s.result)
-        is ExampleState.Error   -> Text(s.message)
-    }
-}
-```
-
-<br/>
-
-## Error Handling
-
-All exceptions that escape an `EventHandler` are caught by the ViewModel and routed to a registered `ErrorHandler`. You should always register at least one.
-
-**Registration order matters** — handlers are matched in the order they were registered. Register more specific exception types before generic ones.
-
-```kotlin
-init {
-    addErrorHandler<NetworkException>(::onNetworkError)   // matched first
-    addErrorHandler<Exception>(::onGenericError)          // fallback
-}
-
-private suspend fun onNetworkError(
-    exception: NetworkException,
-    emit: Emitter<ExampleState, ExampleEffect>,
-) {
-    emit.state(ExampleState.Error("No connection"))
-}
-
-private suspend fun onGenericError(
-    exception: Exception,
-    emit: Emitter<ExampleState, ExampleEffect>,
-) {
-    emit.state(ExampleState.Error("Unexpected error"))
-}
-```
-
-### Reusable error handlers
-
-Implement `RevolverErrorHandler` to share error logic across multiple ViewModels:
-
-```kotlin
-class NetworkErrorHandler<STATE : RevolverState, EFFECT : RevolverEffect>(
-    private val offlineState: STATE,
-) : RevolverErrorHandler<STATE, EFFECT, NetworkException> {
-
-    override suspend fun handleError(exception: NetworkException, emit: Emitter<STATE, EFFECT>) {
-        emit.state(offlineState)
-    }
-}
-
-// In any ViewModel:
-init {
-    addErrorHandler(NetworkErrorHandler(ExampleState.Error("No connection")))
-}
-```
-
-For a zero-configuration fallback that maps **any** exception to a single error state, use the built-in `RevolverDefaultErrorHandler`:
-
-```kotlin
-init {
-    addErrorHandler(RevolverDefaultErrorHandler(ExampleState.Error("Something went wrong")))
-}
-```
-
-<br/>
-
-## iOS Integration
-
-The library exposes `CStateFlow`, `CSharedFlow`, and `CFlow` wrappers that are callable from Swift without importing the full coroutines API.
-
-Use `watch(onNext:)` to observe a flow from Swift. It returns a `DisposableHandle` that **must** be cancelled when the observer is deallocated.
+### iOS (Swift)
+Revolver provides `CFlow` wrappers to make observing states and effects easy from Swift.
 
 ```swift
-class ExampleObservableViewModel: ObservableObject {
-    @Published var state: ExampleState = ExampleState.Loading()
+let viewModel = MainViewModel()
 
-    private let viewModel = ExampleViewModel()
-    private var stateHandle: DisposableHandle?
-    private var effectHandle: DisposableHandle?
+// Observe state
+viewModel.state.watch { state in
+    // Update UI
+}
 
-    init() {
-        stateHandle = viewModel.state.watch { [weak self] state in
-            self?.state = state
-        }
-        effectHandle = viewModel.effect.watch { [weak self] effect in
-            // handle effect
-        }
-        viewModel.emit(event: ExampleEvent.Refresh())
-    }
-
-    deinit {
-        stateHandle?.dispose()
-        effectHandle?.dispose()
-    }
+// Observe effects
+viewModel.effect.watch { effect in
+    // Handle navigation, toasts, etc.
 }
 ```
 
-You can also combine multiple `DisposableHandle` instances with `+`:
+---
 
-```swift
-let handle = stateHandle + effectHandle
-// later:
-handle.dispose()
-```
+## 🧪 Testing
 
-Call `viewModel.dispose()` to cancel the underlying coroutine scope on iOS (Android handles this automatically via the `ViewModel` lifecycle).
-
-<br/>
-
-## Testing
-
-Because all logic lives in `commonMain` and states are immutable, ViewModels can be tested in pure Kotlin without any client dependency.
-
-**Recommended libraries** (already included in `commonTest`):
-- [Turbine](https://github.com/cashapp/turbine) — Flow assertion DSL
-- [Mockative](https://github.com/mockative/mockative) — KMP-compatible mocking
-- `kotlin.test` + `kotlinx.coroutines.test`
+Revolver's architecture allows you to test your entire business logic in `commonTest` without any platform dependencies.
 
 ```kotlin
-@OptIn(ExperimentalCoroutinesApi::class)
-internal class ExampleViewModelTests {
-
-    @Mock
-    private val repository = mock(classOf<ExampleRepository>())
-
-    @BeforeTest
-    fun setup() {
-        Dispatchers.setMain(StandardTestDispatcher())
-    }
-
-    @AfterTest
-    fun dispose() {
-        Dispatchers.resetMain()
-    }
-
-    @Test
-    fun onRefreshEmitsLoadingThenLoaded() = runTest {
-        given(repository).coroutine { fetchData() }.thenReturn("testData")
-
-        val viewModel = ExampleViewModel(repository, initialState = ExampleState.Loading)
-
-        viewModel.state.test {
-            viewModel.emit(ExampleEvent.Refresh)
-
-            assertIs<ExampleState.Loading>(awaitItem())
-            val loaded = assertIs<ExampleState.Loaded>(awaitItem())
-            assertEquals("testData", loaded.result)
-        }
-    }
-
-    @Test
-    fun onRefreshEmitsShowToastEffect() = runTest {
-        given(repository).coroutine { fetchData() }.thenReturn("testData")
-
-        val viewModel = ExampleViewModel(repository, initialState = ExampleState.Loading)
-
-        viewModel.effect.test {
-            viewModel.emit(ExampleEvent.Refresh)
-            val effect = assertIs<ExampleEffect.ShowToast>(awaitItem())
-            assertEquals("Loaded!", effect.message)
-        }
+@Test
+fun `refresh should emit Loading then Success`() = runTest {
+    val viewModel = MainViewModel()
+    viewModel.state.test {
+        viewModel.emit(MainEvent.Refresh)
+        
+        assertIs<MainState.Loading>(awaitItem())
+        val success = assertIs<MainState.Success>(awaitItem())
+        assertEquals("Data", success.data)
     }
 }
 ```
 
-<br/>
+---
 
-## Contribution
+## 📄 Documentation
 
-Bug reports, feature requests, and pull requests are welcome. This library is in active development — production use is at your own discretion.
+For more detailed guides, check the [docs](docs/) folder:
+- [Error Handling Deep Dive](docs/error-handling.md)
+- [Testing Guide](docs/testing.md)
+- [Swift Integration](docs/ios-swift-integration.md)
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request or open an issue.
+
+---
+
+## ⚖️ License
+
+Revolver is released under the MIT License. See [LICENSE](LICENSE) for details.

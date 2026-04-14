@@ -1,33 +1,22 @@
 package com.umain.revolver
 
 /**
- * Interface for reusable error handlers that can be shared across multiple ViewModels.
+ * Interface for implementing reusable and shareable error handlers across multiple ViewModels.
  *
- * Implement this interface when the same error handling logic (e.g. mapping a
- * `NetworkException` to an offline state) is needed in more than one ViewModel.
- * Register instances via [RevolverViewModel.addErrorHandler].
+ * Implementations of this interface can encapsulate complex error handling logic, such as
+ * logging, analytics reporting, or mapping specific exceptions to common error states.
  *
- * ```kotlin
- * class NetworkErrorHandler<STATE : RevolverState, EFFECT : RevolverEffect>(
- *     private val offlineState: STATE,
- * ) : RevolverErrorHandler<STATE, EFFECT, NetworkException> {
- *     override suspend fun handleError(exception: NetworkException, emit: Emitter<STATE, EFFECT>) {
- *         emit.state(offlineState)
- *     }
- * }
- * ```
- *
- * @param STATE the [RevolverState] type of the target ViewModel.
- * @param EFFECT the [RevolverEffect] type of the target ViewModel.
- * @param ERROR the exception type this handler responds to.
+ * @param STATE The type of states emitted by the ViewModel using this handler.
+ * @param EFFECT The type of side effects emitted by the ViewModel using this handler.
+ * @param ERROR The specific type of [Throwable] this handler handles.
  */
 interface RevolverErrorHandler<STATE, EFFECT, ERROR> {
 
     /**
-     * Called when an exception of type [ERROR] is caught by the ViewModel.
+     * Processes the given [exception] and uses the [emit] to update state or emit effects.
      *
-     * @param exception the caught exception.
-     * @param emit use to push new states or effects in response to the error.
+     * @param exception The caught exception to be handled.
+     * @param emit The emitter to update state or trigger side effects in response to the error.
      */
     suspend fun handleError(exception: ERROR, emit: Emitter<STATE, EFFECT>)
 }

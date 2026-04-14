@@ -1,165 +1,59 @@
----
-layout: default
-title: Error Handling
-nav_order: 4
-description: "Registering error handlers and building reusable error strategies."
----
+# Error Handling in Revolver
 
-# Error Handling
+Revolver provides a robust mechanism to handle exceptions that occur during event processing. The core philosophy is to catch all errors within the ViewModel and map them to meaningful UI states or side effects, ensuring the client never receives a raw platform exception.
 
-All exceptions that escape an `EventHandler` are automatically caught by `RevolverViewModel` and routed to a registered `ErrorHandler`. This keeps Kotlin exceptions from propagating to platform clients as unhandled crashes.
+## The Error Handling Flow
 
----
+1. An exception is thrown inside an `EventHandler`.
+2. `RevolverViewModel` catches the `Throwable`.
+3. The ViewModel searches for a registered `ErrorHandler` that matches the exception type (or its supertypes).
+4. If found, the handler is executed, allowing it to emit a new `State` (e.g., `ErrorState`) or an `Effect` (e.g., `ShowToast`).
 
-## The rule: always register at least one handler
+## Registering Handlers
 
-If an exception is thrown and no handler matches it, it is silently swallowed. Register a generic fallback at minimum.
-
-```kotlin
-init {
-    addErrorHandler(RevolverDefaultErrorHandler(MyState.Error("Unexpected error")))
-}
-```
-
----
-
-## Built-in: `RevolverDefaultErrorHandler`
-
-The simplest option. Maps **any** `Throwable` to a single fixed state, and logs at `ERROR` level via Napier.
+### 1. Functional Error Handlers
+You can register a handler for a specific exception type directly in the `init` block:
 
 ```kotlin
-class MyViewModel : RevolverViewModel<MyEvent, MyState, MyEffect>(MyState.Loading) {
-
+class MyViewModel : RevolverViewModel<MyEvent, MyState, MyEffect>(MyState.Idle) {
     init {
-        addEventHandler<MyEvent.Load>(::onLoad)
-        addErrorHandler(RevolverDefaultErrorHandler(MyState.Error("Something went wrong")))
+        addErrorHandler<NetworkException> { exception, emit ->
+            emit.state(MyState.Error("No internet connection"))
+        }
     }
 }
 ```
 
-Use this when you have one generic error state and do not need to distinguish between exception types.
+### 2. Reusable Error Handlers
+For logic shared across multiple ViewModels, implement the `RevolverErrorHandler` interface:
 
----
+```kotlin
+class GlobalErrorHandler<STATE, EFFECT> : RevolverErrorHandler<STATE, EFFECT, Throwable> {
+    override suspend fun handleError(exception: Throwable, emit: Emitter<STATE, EFFECT>) {
+        // Log to crashlytics
+        Logger.log(exception)
+        // Trigger a generic error effect
+        // emit.effect(...) 
+    }
+}
 
-## Inline lambda handlers
+// In your ViewModel:
+init {
+    addErrorHandler(GlobalErrorHandler())
+}
+```
 
-For per-ViewModel logic without a reusable class:
+### 3. Default Error Handler
+Revolver provides `RevolverDefaultErrorHandler` for a quick way to map all exceptions to a single state:
 
 ```kotlin
 init {
-    addErrorHandler<NetworkException> { exception, emit ->
-        emit.state(MyState.Offline)
-        emit.effect(MyEffect.ShowToast("No connection"))
-    }
-    addErrorHandler<Exception> { exception, emit ->
-        emit.state(MyState.Error(exception.message ?: "Unknown error"))
-    }
+    addErrorHandler(RevolverDefaultErrorHandler(MyState.GenericError))
 }
 ```
 
-Or with named suspend functions (easier to test in isolation):
+## Important Considerations
 
-```kotlin
-init {
-    addErrorHandler<NetworkException>(::onNetworkError)
-    addErrorHandler<Exception>(::onGenericError)
-}
-
-private suspend fun onNetworkError(
-    exception: NetworkException,
-    emit: Emitter<MyState, MyEffect>,
-) {
-    emit.state(MyState.Offline)
-    emit.effect(MyEffect.ShowToast("No connection. Check your network and retry."))
-}
-
-private suspend fun onGenericError(
-    exception: Exception,
-    emit: Emitter<MyState, MyEffect>,
-) {
-    emit.state(MyState.Error(exception.message ?: "An unexpected error occurred"))
-}
-```
-
----
-
-## Registration order matters
-
-Error handlers are matched in the order they were registered using `isInstance` checks. Register more specific subtypes **before** broader ones:
-
-```kotlin
-init {
-    // ✅ Correct — specific before generic
-    addErrorHandler<NetworkException>(::onNetworkError)   // matched first
-    addErrorHandler<IOException>(::onIOError)             // matched second
-    addErrorHandler<Exception>(::onGenericError)          // fallback
-
-    // ❌ Wrong — Exception catches everything, NetworkException never fires
-    // addErrorHandler<Exception>(::onGenericError)
-    // addErrorHandler<NetworkException>(::onNetworkError)
-}
-```
-
----
-
-## Reusable error handlers
-
-When the same error logic applies across multiple ViewModels, implement `RevolverErrorHandler<STATE, EFFECT, ERROR>`:
-
-```kotlin
-class NetworkErrorHandler<STATE : RevolverState, EFFECT : RevolverEffect>(
-    private val offlineState: STATE,
-    private val offlineEffect: EFFECT? = null,
-) : RevolverErrorHandler<STATE, EFFECT, NetworkException> {
-
-    override suspend fun handleError(
-        exception: NetworkException,
-        emit: Emitter<STATE, EFFECT>,
-    ) {
-        emit.state(offlineState)
-        offlineEffect?.let { emit.effect(it) }
-    }
-}
-```
-
-Register in any ViewModel:
-
-```kotlin
-class HomeViewModel : RevolverViewModel<HomeEvent, HomeState, HomeEffect>(HomeState.Loading) {
-    init {
-        addErrorHandler(NetworkErrorHandler(HomeState.Offline, HomeEffect.ShowOfflineBanner))
-        addErrorHandler(RevolverDefaultErrorHandler(HomeState.Error("Unexpected error")))
-    }
-}
-
-class ProfileViewModel : RevolverViewModel<ProfileEvent, ProfileState, ProfileEffect>(ProfileState.Loading) {
-    init {
-        addErrorHandler(NetworkErrorHandler(ProfileState.Offline))
-        addErrorHandler(RevolverDefaultErrorHandler(ProfileState.Error("Unexpected error")))
-    }
-}
-```
-
----
-
-## Testing error handlers
-
-Error handlers are tested exactly like event handlers — emit an event whose handler throws, then assert the emitted state.
-
-```kotlin
-@Test
-fun networkErrorEmitsOfflineState() = runTest {
-    given(repository).coroutine { load() }.thenThrow(NetworkException())
-
-    val viewModel = MyViewModel(repository)
-
-    viewModel.state.test {
-        viewModel.emit(MyEvent.Load)
-
-        assertIs<MyState.Loading>(awaitItem())
-        assertIs<MyState.Offline>(awaitItem())
-    }
-}
-```
-
-See the full [Testing guide](testing.md) for setup and patterns.
+- **Order Matters:** Handlers are evaluated in the order they are registered. Register more specific exception types before more general ones (e.g., `IllegalStateException` before `Exception`).
+- **One Handler per Type:** Each exception type can only have one registered handler.
+- **Uncaught Exceptions:** If no handler matches a thrown exception, the exception will bubble up (and potentially crash the app if not handled at the platform level), so it's best practice to always include a catch-all for `Exception` or `Throwable`.

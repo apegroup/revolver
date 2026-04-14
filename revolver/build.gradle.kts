@@ -22,9 +22,26 @@ kotlin {
     }
 
     jvmToolchain(21)
+    jvm()
+    js(IR) {
+        browser()
+        nodejs()
+    }
+    @OptIn(org.jetbrains.kotlin.gradle.targets.js.dsl.ExperimentalWasmDsl::class)
+    wasmJs {
+        browser()
+        nodejs()
+    }
+
     iosArm64()
     iosX64()
     iosSimulatorArm64()
+
+    macosX64()
+    macosArm64()
+
+    linuxX64()
+    mingwX64()
 
     sourceSets {
         commonMain {
