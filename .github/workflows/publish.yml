@@ -33,7 +33,7 @@ jobs:
         run: ./gradlew --profile clean publishAllPublicationsToGitHubPackagesRepository
 
       - name: Upload profile reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: profile-report
           path: build/reports/profile/
