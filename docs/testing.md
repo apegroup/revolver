@@ -1,3 +1,10 @@
+---
+layout: default
+title: Testing
+nav_order: 5
+description: "Unit testing ViewModels with Turbine and Mockative."
+---
+
 # Testing
 
 Because all business logic lives in `commonMain` and states are immutable value types, Revolver ViewModels can be tested as pure Kotlin unit tests — no Android emulator, no iOS simulator, no UI harness needed.

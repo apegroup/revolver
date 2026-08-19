@@ -1,0 +1,21 @@
+title: Revolver
+description: Immutable event-based state management framework for Kotlin Multiplatform.
+theme: jekyll-theme-cayman
+show_downloads: false
+
+# Navigation order for sidebar (Cayman theme uses page titles only, but this helps tools)
+nav:
+  - title: Home
+    url: /
+  - title: Getting Started
+    url: /getting-started
+  - title: Core Concepts
+    url: /concepts
+  - title: Error Handling
+    url: /error-handling
+  - title: Testing
+    url: /testing
+  - title: iOS Integration
+    url: /ios-integration
+  - title: API Reference
+    url: /api-reference

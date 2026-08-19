@@ -1,3 +1,10 @@
+---
+layout: default
+title: Core Concepts
+nav_order: 3
+description: "Event, State, Effect, ViewModel, and Emitter explained."
+---
+
 # Core Concepts
 
 Revolver is built around three primitives and a single rule: **data flows in one direction**.

@@ -3,6 +3,8 @@ package com.umain.revolver
 import com.umain.revolver.flow.cSharedFlow
 import com.umain.revolver.flow.cStateFlow
 import io.github.aakira.napier.Napier
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -46,6 +48,8 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
 
     private val eventHandlers = mutableMapOf<KClass<*>, EventHandler<EVENT, STATE, EFFECT>>()
     private val errorHandlers = mutableMapOf<KClass<*>, ErrorHandler<Throwable, STATE, EFFECT>>()
+    @PublishedApi internal val cancellableHandlerTypes = mutableSetOf<KClass<*>>()
+    private val activeJobs = mutableMapOf<KClass<*>, Job>()
 
     private val events = Channel<EVENT>(Channel.BUFFERED).also {
         it.receiveAsFlow()
@@ -84,13 +88,45 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
     /** Routes an incoming [event] to its registered [EventHandler], or throws if none exists. */
     private suspend fun mapEvent(event: EVENT) {
         Napier.d("RevolverViewModel ${this@RevolverViewModel::class.simpleName} received event ${event::class.simpleName}")
+        if (event::class in cancellableHandlerTypes) {
+            mapCancellableEvent(event)
+        } else {
+            mapSequentialEvent(event)
+        }
+    }
+
+    /**
+     * Cancels any in-flight handler of the same event type, then launches the new handler in a
+     * separate coroutine and returns immediately — unblocking the event channel for the next event.
+     */
+    private fun mapCancellableEvent(event: EVENT) {
+        activeJobs[event::class]?.cancel()
+        activeJobs[event::class] = viewModelScope.launch {
+            try {
+                val handler = eventHandlers[event::class]
+                    ?: throw IllegalStateException("the event $event was fired without a handler to handle it")
+                handler(event, emitter)
+            } catch (_: CancellationException) {
+                // Normal cancellation from a superseding event — not an application error.
+            } catch (e: Throwable) {
+                Napier.w("Error caught in RevolverViewModel ${this@RevolverViewModel::class.simpleName}", e)
+                mapException(e)
+            }
+        }.also { job ->
+            job.invokeOnCompletion { cause ->
+                if (cause !is CancellationException) activeJobs.remove(event::class)
+            }
+        }
+    }
+
+    /** Original sequential behavior — suspends until the handler completes. */
+    private suspend fun mapSequentialEvent(event: EVENT) {
         try {
             val handler = eventHandlers[event::class]
                 ?: throw IllegalStateException("the event $event was fired without a handler to handle it")
-
             handler(event, emitter)
         } catch (e: Throwable) {
-            Napier.w("Error caught in RevolverViewModel ${this::class.simpleName}", e)
+            Napier.w("Error caught in RevolverViewModel ${this@RevolverViewModel::class.simpleName}", e)
             mapException(e)
         }
     }
@@ -162,6 +198,31 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
         handler as? EventHandler<EVENT, STATE, EFFECT>
             ?: throw IllegalArgumentException("RevolverEvent type ${T::class::simpleName} must extend EVENT")
         internalEventHandler(T::class, handler)
+    }
+
+    /**
+     * Registers a cancellable [handler] for event type [T].
+     *
+     * Unlike [addEventHandler], when a new [T] event arrives while a previous handler for [T]
+     * is still running, the previous coroutine is **cancelled** before the new one is launched.
+     * The event channel is unblocked immediately — other queued events continue to be processed
+     * without waiting for the previous handler to finish.
+     *
+     * Use this for long-running operations (network calls, heavy computation) where a newer event
+     * of the same type should supersede the in-flight one — for example, switching tabs while the
+     * previous tab's request is still loading.
+     *
+     * Exceptions are routed to registered [addErrorHandler] handlers exactly as with
+     * [addEventHandler]. [CancellationException] is swallowed silently.
+     *
+     * @param T the [RevolverEvent] subtype this handler responds to.
+     * @param handler the suspend function that receives the event and an [Emitter].
+     * @throws IllegalStateException if a handler for [T] is already registered.
+     */
+    @Suppress("UNCHECKED_CAST")
+    inline fun <reified T : EVENT> addCancellableEventHandler(noinline handler: EventHandler<T, STATE, EFFECT>) {
+        addEventHandler<T>(handler)
+        cancellableHandlerTypes.add(T::class)
     }
 
     /** @suppress Internal use only. */

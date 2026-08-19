@@ -1,3 +1,10 @@
+---
+layout: default
+title: API Reference
+nav_order: 7
+description: "Complete public API listing for Revolver."
+---
+
 # API Reference
 
 All public symbols are in the `com.umain.revolver` package. Flow wrappers are in `com.umain.revolver.flow`.
