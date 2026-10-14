@@ -6,6 +6,10 @@ import io.github.aakira.napier.Napier
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.receiveAsFlow
@@ -67,6 +71,10 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
      * active subscriber and is not replayed to late collectors.
      */
     override val effect = _effect.cSharedFlow(viewModelScope)
+
+    override val stateFlow: StateFlow<STATE> = _state.asStateFlow()
+
+    override val effectFlow: SharedFlow<EFFECT> = _effect.asSharedFlow()
 
     private val emitter: Emitter<STATE, EFFECT> = object : Emitter<STATE, EFFECT> {
         override val state: StateEmitter<STATE> = { state: STATE ->

@@ -1,6 +1,7 @@
 # Documentation update log
 
 ## 2026-10-14
+* **Update**: Documented Swift export support in [iOS integration](ios-integration.md#swift-export): the new `stateFlow` and `effectFlow` properties, which Swift export bridges to `AsyncSequence`. Added them to the [API reference](api-reference.md) and [Core concepts](concepts.md). Noted that Objective-C export can rename `state`/`effect` to `state_`/`effect_`.
 * **Update**: Registering a second error handler for the same exception type now throws `IllegalStateException`, as event handlers already did. Earlier versions silently replaced the handler. Updated [Core concepts](concepts.md), [Error handling](error-handling.md) and the [API reference](api-reference.md).
 * **Update**: Converted `docs/` into an OKF v0.2 bundle. Each concept now has `type`, `title`, `description`, `tags`, `generated` and `sources` frontmatter, and the root [index](index.md) declares `okf_version`.
 * **Update**: Checked every page against the library source. Fixed the claims about plain `class` states, duplicate error handlers and overriding the ViewModel scope. Fixed the Compose snippets that emitted events during composition, and documented sequential event processing and dropped effects in [Core concepts](concepts.md).
