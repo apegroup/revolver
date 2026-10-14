@@ -5,7 +5,7 @@ description: Every public type and function in com.umain.revolver and com.umain.
 tags: [api, reference, kotlin]
 resource: https://github.com/apegroup/revolver/tree/main/revolver/src
 status: stable
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T22:05:00Z }
 sources:
   - id: common-src
     resource: https://github.com/apegroup/revolver/tree/main/revolver/src/commonMain/kotlin/com/umain/revolver
@@ -52,6 +52,8 @@ The public contract of a ViewModel. Code that uses a ViewModel can depend on thi
 |---|---|---|
 | `state` | `CStateFlow<STATE>` | Current state. Always holds a value. |
 | `effect` | `CSharedFlow<EFFECT>` | One-shot effects. Not replayed. |
+| `stateFlow` | `StateFlow<STATE>` | The same stream as `state`, typed as a plain `StateFlow` for Swift export. Has a default implementation. |
+| `effectFlow` | `SharedFlow<EFFECT>` | The same stream as `effect`, typed as a plain `SharedFlow` for Swift export. Has a default implementation. |
 | `emit(event)` | `(EVENT) -> Unit` | Queues an event for processing. |
 
 ## `RevolverViewModel<EVENT, STATE, EFFECT>(initialState: STATE)`
@@ -106,7 +108,7 @@ On Android the wrappers just delegate to the wrapped flow. On iOS they add:
 | `interface DisposableHandle : kotlinx.coroutines.DisposableHandle` | `dispose()` cancels the observation. |
 | `operator fun DisposableHandle.plus(other)` | Returns a handle that disposes both. |
 
-See [iOS integration](ios-integration.md) for usage.
+See [iOS integration](ios-integration.md) for usage, including [Swift export](ios-integration.md#swift-export).
 
 [^common-src]: commonMain sources
 [^ios-src]: iosMain sources
