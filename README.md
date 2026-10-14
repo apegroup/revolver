@@ -123,7 +123,7 @@ fun ExampleScreen(viewModel: ExampleViewModel) {
 }
 ```
 
-For iOS, see [iOS integration](docs/ios-integration.md).
+For iOS, see [iOS integration](docs/ios-integration.md). It covers both Objective-C export (`watch`) and Swift export (`stateFlow` / `effectFlow` as `AsyncSequence`).
 
 <br/>
 
