@@ -1,123 +1,95 @@
-# iOS Integration
-
-Revolver targets iOS via Kotlin Multiplatform. The shared library compiles to a native framework that can be consumed from Swift. This guide covers the Swift-side integration patterns.
-
+---
+type: Guide
+title: iOS integration
+description: Observe state and effects from Swift with watch, and manage the ViewModel lifecycle.
+tags: [ios, swift, swiftui, uikit, lifecycle]
+status: stable
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+sources:
+  - id: ios-cflow
+    resource: https://github.com/apegroup/revolver/blob/main/revolver/src/iosMain/kotlin/com/umain/revolver/flow/CFlow.kt
+    title: iOS CFlow with watch()
+  - id: ios-disposable
+    resource: https://github.com/apegroup/revolver/blob/main/revolver/src/iosMain/kotlin/com/umain/revolver/flow/DisposableHandle.kt
+    title: iOS DisposableHandle
+  - id: ios-base-viewmodel
+    resource: https://github.com/apegroup/revolver/blob/main/revolver/src/iosMain/kotlin/com/umain/revolver/BaseViewModel.kt
+    title: iOS BaseViewModel
 ---
 
-## How flows are exposed
+# iOS integration
 
-Kotlin's `Flow` API is not directly callable from Swift. Revolver wraps flows in platform-aware classes that expose a `watch(onNext:)` method instead:
+Kotlin `Flow` can't be collected directly from Swift. On iOS, `state` and `effect` are wrappers (`CStateFlow`, `CSharedFlow`, both subclasses of `CFlow`) that add a `watch(onNext:)` method.
 
-| Kotlin | Swift-callable wrapper | Used for |
-|---|---|---|
-| `StateFlow<STATE>` | `CStateFlow<STATE>` | `viewModel.state` |
-| `SharedFlow<EFFECT>` | `CSharedFlow<EFFECT>` | `viewModel.effect` |
-| `Flow<T>` | `CFlow<T>` | General-purpose use |
+## Observing a flow
 
----
-
-## `watch(onNext:)`
-
-The primary observation API. Returns a `DisposableHandle` that **must** be cancelled when the observer is deallocated:
+`watch` starts collecting on `Dispatchers.Main` and returns a `DisposableHandle`.[^ios-cflow] Call `dispose()` on the handle to stop observing:
 
 ```swift
 let handle = viewModel.state.watch { state in
-    // called on the main thread for each emitted value
-    self.render(state: state)
+    render(state)
 }
 
-// When done:
 handle.dispose()
 ```
 
-Values are delivered on the **main thread** (`Dispatchers.Main`).
-
----
-
-## `DisposableHandle`
-
-A lightweight cancellation token for a running flow observation.
+Combine handles with `+` to dispose several at once:[^ios-disposable]
 
 ```swift
-// Cancel a single subscription
-handle.dispose()
-
-// Combine multiple handles with + operator
-let combinedHandle = stateHandle + effectHandle
-combinedHandle.dispose() // cancels both
+let handles = stateHandle + effectHandle
+handles.dispose()
 ```
 
-Always cancel in `deinit` to avoid keeping the ViewModel's coroutine scope alive longer than needed.
+## Lifecycle
 
----
+On Android the ViewModel scope is cancelled in `onCleared()`. iOS has no equivalent, so call `viewModel.dispose()` when the owner goes away. Otherwise the scope and its coroutines keep running.[^ios-base-viewmodel]
 
-## Lifecycle management
-
-iOS has no automatic ViewModel clearing equivalent to Android's `onCleared()`. You must call `viewModel.dispose()` manually.
-
-```swift
-deinit {
-    handle?.dispose()
-    viewModel.dispose()
-}
-```
-
-`dispose()` cancels the `viewModelScope` and all coroutines running within it.
-
----
-
-## Recommended pattern: `ObservableObject` wrapper
-
-Wrap the Kotlin ViewModel in a Swift `ObservableObject` to drive SwiftUI views reactively:
+## SwiftUI: an `ObservableObject` wrapper
 
 ```swift
 import SwiftUI
-import shared // your KMP framework module name
+import shared // your KMP framework
 
 final class SearchObservableViewModel: ObservableObject {
-
-    @Published var state: SearchState = SearchState.Idle()
+    @Published private(set) var state: SearchState = SearchState.Idle.shared
+    var onNavigate: ((String) -> Void)?
 
     private let viewModel: SearchViewModel
-    private var handle: DisposableHandle?
+    private var handles: DisposableHandle?
 
     init(repository: SearchRepository) {
-        self.viewModel = SearchViewModel(repository: repository)
+        viewModel = SearchViewModel(repository: repository)
 
-        handle = viewModel.state.watch { [weak self] newState in
-            self?.state = newState
+        let stateHandle = viewModel.state.watch { [weak self] state in
+            self?.state = state
         }
+        let effectHandle = viewModel.effect.watch { [weak self] effect in
+            if let nav = effect as? SearchEffect.NavigateToDetail {
+                self?.onNavigate?(nav.id)
+            }
+        }
+        handles = stateHandle + effectHandle
     }
 
-    func search(query: String) {
+    func search(_ query: String) {
         viewModel.emit(event: SearchEvent.QueryChanged(query: query))
     }
 
-    func clear() {
-        viewModel.emit(event: SearchEvent.ClearResults())
-    }
-
     deinit {
-        handle?.dispose()
+        handles?.dispose()
         viewModel.dispose()
     }
 }
-```
 
-Use it in a SwiftUI view:
-
-```swift
 struct SearchView: View {
-    @StateObject private var viewModel = SearchObservableViewModel(
-        repository: SearchRepositoryImpl()
-    )
+    @StateObject private var model = SearchObservableViewModel(repository: SearchRepositoryImpl())
 
     var body: some View {
-        switch viewModel.state {
-        case let loaded as SearchState.Results:
-            List(loaded.items, id: \.self) { Text($0) }
+        switch model.state {
         case is SearchState.Loading:
             ProgressView()
+        case let results as SearchState.Results:
+            List(results.items, id: \.self) { Text($0) }
         case let error as SearchState.Error:
             Text(error.message)
         default:
@@ -127,106 +99,42 @@ struct SearchView: View {
 }
 ```
 
----
+Kotlin `object` declarations are accessed through `.shared` in Swift, for example `SearchState.Idle.shared`. Keep effects out of `@Published` properties so they are handled once and not re-rendered.
 
-## Observing effects
+## UIKit
 
-Observe `viewModel.effect` separately. One-shot effects (navigation, alerts) should not live in `@Published` state:
-
-```swift
-final class SearchObservableViewModel: ObservableObject {
-
-    @Published var state: SearchState = SearchState.Idle()
-    var onNavigate: ((String) -> Void)?
-
-    private var handles: DisposableHandle?
-
-    init(viewModel: SearchViewModel) {
-        let stateHandle = viewModel.state.watch { [weak self] in
-            self?.state = $0
-        }
-
-        let effectHandle = viewModel.effect.watch { [weak self] effect in
-            switch effect {
-            case let nav as SearchEffect.NavigateToDetail:
-                self?.onNavigate?(nav.id)
-            default:
-                break
-            }
-        }
-
-        handles = stateHandle + effectHandle
-    }
-
-    deinit {
-        handles?.dispose()
-    }
-}
-```
-
----
-
-## UIKit pattern
-
-For UIKit instead of SwiftUI, observe in `viewDidLoad` and update in the `onNext` closure:
+Observe in `viewDidLoad`. `watch` already delivers on the main thread:
 
 ```swift
-class SearchViewController: UIViewController {
-
-    private let observableViewModel = SearchObservableViewModel(...)
-    private var cancellable: AnyCancellable?
+final class SearchViewController: UIViewController {
+    private let viewModel = SearchViewModel(repository: SearchRepositoryImpl())
+    private var stateHandle: DisposableHandle?
 
     override func viewDidLoad() {
         super.viewDidLoad()
-
-        cancellable = observableViewModel.$state.sink { [weak self] state in
-            self?.render(state: state)
+        stateHandle = viewModel.state.watch { [weak self] state in
+            self?.render(state)
         }
     }
 
-    private func render(state: SearchState) {
-        switch state {
-        case is SearchState.Loading:
-            activityIndicator.startAnimating()
-        case let results as SearchState.Results:
-            activityIndicator.stopAnimating()
-            tableView.reloadData()
-        default:
-            break
-        }
+    deinit {
+        stateHandle?.dispose()
+        viewModel.dispose()
     }
 }
 ```
-
-Alternatively, use `watch` directly without Combine:
-
-```swift
-private var stateHandle: DisposableHandle?
-
-override func viewDidLoad() {
-    super.viewDidLoad()
-    stateHandle = viewModel.state.watch { [weak self] state in
-        DispatchQueue.main.async { self?.render(state: state) }
-    }
-}
-
-deinit {
-    stateHandle?.dispose()
-    viewModel.dispose()
-}
-```
-
-> `watch` already delivers on the main thread, but wrapping in `DispatchQueue.main.async` is safe and harmless.
-
----
 
 ## Summary
 
-| Task | Swift API |
+| Task | Swift |
 |---|---|
 | Observe state | `viewModel.state.watch { }` |
 | Observe effects | `viewModel.effect.watch { }` |
-| Send an event | `viewModel.emit(event: MyEvent.Action())` |
-| Cancel a subscription | `handle.dispose()` |
-| Combine handles | `let h = handle1 + handle2` |
-| Clean up ViewModel | `viewModel.dispose()` (in `deinit`) |
+| Send an event | `viewModel.emit(event: MyEvent.Action.shared)` |
+| Stop observing | `handle.dispose()` |
+| Combine handles | `handle1 + handle2` |
+| Release the ViewModel | `viewModel.dispose()` in `deinit` |
+
+[^ios-cflow]: iOS CFlow with watch()
+[^ios-disposable]: iOS DisposableHandle
+[^ios-base-viewmodel]: iOS BaseViewModel

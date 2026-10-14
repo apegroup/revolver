@@ -73,8 +73,8 @@ interface RevolverEvent
  * Marker interface for all immutable view states emitted by a [RevolverViewModel].
  *
  * Implement with a sealed class. Prefer `object` for states without data and `data class`
- * for states that carry payloads — plain `class` can suppress emissions when the value does
- * not structurally change.
+ * for states that carry payloads. The state flow skips values equal to the current one, so
+ * structural equality avoids redundant emissions; plain `class` compares by identity.
  *
  * ```kotlin
  * sealed class ExampleState : RevolverState {

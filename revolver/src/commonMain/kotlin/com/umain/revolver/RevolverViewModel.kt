@@ -118,11 +118,10 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
      * Registers a suspend lambda as an [ErrorHandler] for exception type [ERROR].
      *
      * Handlers are matched in registration order — register more specific types before broader ones.
-     * Each exception type may have at most one handler.
+     * Registering a second handler for the same exception type replaces the first one.
      *
      * @param ERROR the exception type this handler responds to; must extend [Throwable].
      * @param handler the suspend function that receives the exception and an [Emitter].
-     * @throws IllegalStateException if a handler for [ERROR] is already registered.
      */
     @Suppress("UNCHECKED_CAST")
     inline fun <reified ERROR : Throwable> addErrorHandler(noinline handler: ErrorHandler<ERROR, STATE, EFFECT>) {

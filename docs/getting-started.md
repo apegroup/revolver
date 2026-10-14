@@ -1,8 +1,24 @@
-# Getting Started
+---
+type: Guide
+title: Getting started
+description: Install Revolver, then build and connect your first ViewModel on Android and iOS.
+tags: [installation, setup, android, compose, ios]
+status: stable
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+sources:
+  - id: build-config
+    resource: https://github.com/apegroup/revolver/blob/main/revolver/build.gradle.kts
+    title: Library build configuration
+  - id: gradle-properties
+    resource: https://github.com/apegroup/revolver/blob/main/gradle.properties
+    title: SDK levels and library version
+---
+
+# Getting started
 
 ## Installation
 
-Revolver is published to GitHub Packages. Add the repository to your `settings.gradle.kts`:
+Revolver is published to GitHub Packages. Add the repository in `settings.gradle.kts`:
 
 ```kotlin
 dependencyResolutionManagement {
@@ -18,7 +34,9 @@ dependencyResolutionManagement {
 }
 ```
 
-Then add the dependency in your `commonMain` source set:
+`GH_TOKEN` must be a GitHub personal access token with at least the `read:packages` scope.
+
+Then add the dependency to `commonMain`:
 
 ```kotlin
 kotlin {
@@ -30,67 +48,44 @@ kotlin {
 }
 ```
 
-> **GitHub token**: The `GH_TOKEN` environment variable must be a GitHub Personal Access Token (classic or fine-grained) with at least `read:packages` scope.
+## Platform support
 
----
-
-## Minimum requirements
-
-| Platform | Minimum version |
+| Target | Requirement |
 |---|---|
-| Android | API 29 (Android 10) |
-| iOS | 14.0 |
-| JVM | Java 21 |
-| Kotlin | 2.3.0 |
+| Android | `minSdk` 29 |
+| iOS | 14.0 (`iosArm64`, `iosX64`, `iosSimulatorArm64`) |
 
----
+The library is built with Kotlin 2.4 and JDK 21.[^build-config] [^gradle-properties]
 
-## Your first ViewModel in 4 steps
+## Your first ViewModel
 
-### Step 1 — Define events
-
-Events are messages sent **from the client to the ViewModel**. Model them as a sealed class:
+### 1. Define events, states and effects
 
 ```kotlin
 sealed class CounterEvent : RevolverEvent {
     object Increment : CounterEvent()
-    object Decrement : CounterEvent()
     object Reset : CounterEvent()
 }
-```
 
-### Step 2 — Define states
-
-States are **immutable snapshots** of what the UI should render. Use `object` for states without data and `data class` for states that carry a payload:
-
-```kotlin
 sealed class CounterState : RevolverState {
     data class Idle(val count: Int = 0) : CounterState()
 }
-```
 
-> Avoid plain `class` for state subtypes — it bypasses structural equality and can suppress emissions when the ViewModel sets the same logical value twice.
-
-### Step 3 — Define effects (optional)
-
-Effects are **one-shot side actions** such as navigation or toasts. Skip this step if your ViewModel has no side effects:
-
-```kotlin
 sealed class CounterEffect : RevolverEffect {
     object ResetConfirmed : CounterEffect()
 }
 ```
 
-### Step 4 — Implement the ViewModel
+[Core concepts](concepts.md) covers what each of these is for.
+
+### 2. Implement the ViewModel
 
 ```kotlin
 class CounterViewModel : RevolverViewModel<CounterEvent, CounterState, CounterEffect>(
     initialState = CounterState.Idle(),
 ) {
-
     init {
         addEventHandler<CounterEvent.Increment>(::onIncrement)
-        addEventHandler<CounterEvent.Decrement>(::onDecrement)
         addEventHandler<CounterEvent.Reset>(::onReset)
         addErrorHandler(RevolverDefaultErrorHandler(CounterState.Idle()))
     }
@@ -103,14 +98,6 @@ class CounterViewModel : RevolverViewModel<CounterEvent, CounterState, CounterEf
         emit.state(CounterState.Idle(current + 1))
     }
 
-    private suspend fun onDecrement(
-        event: CounterEvent.Decrement,
-        emit: Emitter<CounterState, CounterEffect>,
-    ) {
-        val current = (state.value as CounterState.Idle).count
-        emit.state(CounterState.Idle(current - 1))
-    }
-
     private suspend fun onReset(
         event: CounterEvent.Reset,
         emit: Emitter<CounterState, CounterEffect>,
@@ -121,77 +108,44 @@ class CounterViewModel : RevolverViewModel<CounterEvent, CounterState, CounterEf
 }
 ```
 
----
-
-## Connecting to Android (Jetpack Compose)
+### 3. Connect it on Android (Jetpack Compose)
 
 ```kotlin
 @Composable
 fun CounterScreen(viewModel: CounterViewModel = viewModel()) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
-        viewModel.emit(CounterEvent.Increment) // trigger an initial event if needed
-
         viewModel.effect.collect { effect ->
             when (effect) {
-                is CounterEffect.ResetConfirmed ->
-                    Toast.makeText(LocalContext.current, "Counter reset!", Toast.LENGTH_SHORT).show()
+                CounterEffect.ResetConfirmed ->
+                    Toast.makeText(context, "Counter reset", Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     when (val s = state) {
-        is CounterState.Idle -> {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Count: ${s.count}")
-                Button(onClick = { viewModel.emit(CounterEvent.Increment) }) { Text("+") }
-                Button(onClick = { viewModel.emit(CounterEvent.Decrement) }) { Text("−") }
-                Button(onClick = { viewModel.emit(CounterEvent.Reset) }) { Text("Reset") }
-            }
+        is CounterState.Idle -> Column {
+            Text("Count: ${s.count}")
+            Button(onClick = { viewModel.emit(CounterEvent.Increment) }) { Text("+") }
+            Button(onClick = { viewModel.emit(CounterEvent.Reset) }) { Text("Reset") }
         }
     }
 }
 ```
 
----
+Emit events from callbacks or from `LaunchedEffect`, never directly in the composable body. Code in the body runs again on every recomposition.
 
-## Connecting to iOS (SwiftUI)
+### 4. Connect it on iOS (SwiftUI)
 
-See the full [iOS Integration guide](ios-integration.md).
-
-```swift
-class CounterObservableViewModel: ObservableObject {
-    @Published var count: Int = 0
-
-    private let viewModel = CounterViewModel()
-    private var handle: DisposableHandle?
-
-    init() {
-        handle = viewModel.state.watch { [weak self] state in
-            if let idle = state as? CounterState.Idle {
-                self?.count = Int(idle.count)
-            }
-        }
-    }
-
-    func increment() { viewModel.emit(event: CounterEvent.Increment()) }
-    func decrement() { viewModel.emit(event: CounterEvent.Decrement()) }
-    func reset()     { viewModel.emit(event: CounterEvent.Reset()) }
-
-    deinit {
-        handle?.dispose()
-        viewModel.dispose()
-    }
-}
-```
-
----
+Wrap the ViewModel in an `ObservableObject`, observe with `watch`, and dispose in `deinit`. [iOS integration](ios-integration.md) walks through the full pattern.
 
 ## Next steps
 
-- [Core Concepts](concepts.md) — understand Event, State, and Effect in depth
-- [Error Handling](error-handling.md) — register handlers and build reusable strategies
-- [Testing](testing.md) — write deterministic unit tests with Turbine and Mockative
-- [iOS Integration](ios-integration.md) — Swift observation patterns and lifecycle management
-- [API Reference](api-reference.md) — full public API listing
+- [Error handling](error-handling.md): map exceptions to states and effects
+- [Testing](testing.md): unit test ViewModels in `commonTest`
+- [API reference](api-reference.md): every public symbol
+
+[^build-config]: Library build configuration
+[^gradle-properties]: SDK levels and library version
