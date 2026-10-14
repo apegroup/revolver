@@ -62,7 +62,7 @@ init {
 }
 ```
 
-If `Exception` were registered first, `onNetworkError` would never run. Registering a second handler for the same type replaces the first one.
+If `Exception` were registered first, `onNetworkError` would never run. Each exception type can have only one handler; registering a second one throws `IllegalStateException`.
 
 ## Reusable handlers
 

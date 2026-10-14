@@ -123,10 +123,10 @@ These rules come straight from the implementation.[^viewmodel-src]
 - **Events are processed one at a time, in order.** `emit` puts the event on a buffered channel, and a single collector runs the matching handlers one after another. A handler that suspends, for example on a network call, holds back every event behind it. To run work in parallel, launch it in `viewModelScope` from the handler.
 - **`emit` throws if the buffer is full.** The channel holds 64 pending events. If it can't accept another, `emit` throws `IllegalStateException`.
 - **An event without a handler is an error.** The ViewModel throws `IllegalStateException`, which goes through the error handlers like any other exception.
-- **Error handlers are matched in registration order.** The first handler whose type matches the exception (`isInstance`) wins. Register specific types before general ones. Registering a second handler for the same type replaces the first.
+- **Error handlers are matched in registration order.** The first handler whose type matches the exception (`isInstance`) wins. Register specific types before general ones.
 - **Unmatched exceptions are dropped.** The ViewModel logs them through Napier at warning level and continues. Always register a catch-all, such as `RevolverDefaultErrorHandler`.
 - **Effects with no collector are lost.** `effect` is a `SharedFlow` with no replay, so if nothing is collecting when an effect is emitted, it is discarded.
-- **Registering a second event handler for the same type throws** `IllegalStateException`.
+- **Each type gets one handler.** Registering a second event handler or error handler for the same type throws `IllegalStateException`.
 
 The handler signatures are defined as type aliases.[^types-src] See the [API reference](api-reference.md) for the complete list.
 

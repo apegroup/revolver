@@ -61,7 +61,7 @@ The public contract of a ViewModel. Code that uses a ViewModel can depend on thi
 | Function | Behaviour |
 |---|---|
 | `addEventHandler<T : EVENT>(handler: EventHandler<T, STATE, EFFECT>)` | Registers the handler for event type `T`. Throws `IllegalStateException` if `T` already has a handler. |
-| `addErrorHandler<ERROR : Throwable>(handler: ErrorHandler<ERROR, STATE, EFFECT>)` | Registers a handler for exceptions of type `ERROR`. Handlers are tried in registration order, and the first match wins. Registering the same type again replaces the earlier handler. |
+| `addErrorHandler<ERROR : Throwable>(handler: ErrorHandler<ERROR, STATE, EFFECT>)` | Registers a handler for exceptions of type `ERROR`. Handlers are tried in registration order, and the first match wins. Throws `IllegalStateException` if `ERROR` already has a handler. |
 | `addErrorHandler<ERROR : Throwable>(errorHandler: RevolverErrorHandler<STATE, EFFECT, ERROR>)` | Same as above, for a reusable handler object. |
 | `emit(event: EVENT)` | Puts the event on a 64-slot buffered channel. Events are handled one at a time, in order. Throws `IllegalStateException` if the channel can't accept the event. |
 
