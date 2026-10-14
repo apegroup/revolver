@@ -1,325 +1,112 @@
-# API Reference
-
-All public symbols are in the `com.umain.revolver` package. Flow wrappers are in `com.umain.revolver.flow`.
-
 ---
+type: API Reference
+title: API reference
+description: Every public type and function in com.umain.revolver and com.umain.revolver.flow.
+tags: [api, reference, kotlin]
+resource: https://github.com/apegroup/revolver/tree/main/revolver/src
+status: stable
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+sources:
+  - id: common-src
+    resource: https://github.com/apegroup/revolver/tree/main/revolver/src/commonMain/kotlin/com/umain/revolver
+    title: commonMain sources
+  - id: ios-src
+    resource: https://github.com/apegroup/revolver/tree/main/revolver/src/iosMain/kotlin/com/umain/revolver
+    title: iosMain sources
+---
+
+# API reference
+
+Core types are in `com.umain.revolver`. Flow wrappers are in `com.umain.revolver.flow`.[^common-src]
 
 ## Marker interfaces
 
-### `RevolverEvent`
-
 ```kotlin
 interface RevolverEvent
-```
-
-Marker interface for all events sent from clients to a `RevolverViewModel`. Implement with a sealed class to enumerate every action the ViewModel can handle.
-
----
-
-### `RevolverState`
-
-```kotlin
 interface RevolverState
-```
-
-Marker interface for all immutable view states emitted by a `RevolverViewModel`. Implement with a sealed class. Prefer `object` for states without data and `data class` for states that carry payloads.
-
----
-
-### `RevolverEffect`
-
-```kotlin
 interface RevolverEffect
 ```
 
-Marker interface for one-shot side effects emitted by a `RevolverViewModel`. Effects are delivered via a `SharedFlow` and not replayed to late collectors.
+Implement each one with a sealed class. See [Core concepts](concepts.md).
 
----
-
-## Emitter
+## Handler types
 
 ```kotlin
-interface Emitter<STATE, EFFECT>
-```
-
-Passed to every `EventHandler` and `ErrorHandler`. The only way to push values from inside a handler.
-
-| Member | Type | Description |
-|---|---|---|
-| `state` | `StateEmitter<STATE>` | Replaces the current state immediately. |
-| `effect` | `EffectEmitter<EFFECT>` | Broadcasts a one-shot effect asynchronously. |
-
-```kotlin
-typealias StateEmitter<STATE>   = (state: STATE) -> Unit
+typealias StateEmitter<STATE> = (state: STATE) -> Unit
 typealias EffectEmitter<EFFECT> = (effect: EFFECT) -> Unit
+
+interface Emitter<STATE, EFFECT> {
+    val state: StateEmitter<STATE>   // sets the current state immediately
+    val effect: EffectEmitter<EFFECT> // delivers a one-shot effect asynchronously
+}
+
+typealias EventHandler<EVENT, STATE, EFFECT> = suspend (event: EVENT, emit: Emitter<STATE, EFFECT>) -> Unit
+typealias ErrorHandler<ERROR, STATE, EFFECT> = suspend (exception: ERROR, emit: Emitter<STATE, EFFECT>) -> Unit
 ```
 
----
+## `RevolverViewModelInterface<EVENT, STATE, EFFECT>`
 
-## Function types
-
-### `EventHandler`
-
-```kotlin
-typealias EventHandler<EVENT, STATE, EFFECT> = suspend (
-    event: EVENT,
-    emit: Emitter<STATE, EFFECT>,
-) -> Unit
-```
-
-Suspend function that processes a single `EVENT` subtype. Registered via `RevolverViewModel.addEventHandler`. Each event type may have at most one handler.
-
----
-
-### `ErrorHandler`
-
-```kotlin
-typealias ErrorHandler<ERROR, STATE, EFFECT> = suspend (
-    exception: ERROR,
-    emit: Emitter<STATE, EFFECT>,
-) -> Unit
-```
-
-Suspend function that handles a specific exception type. Registered via `RevolverViewModel.addErrorHandler`. Matched in registration order.
-
----
-
-## RevolverViewModelInterface
-
-```kotlin
-interface RevolverViewModelInterface<EVENT, STATE, EFFECT>
-```
-
-Public contract for a Revolver ViewModel. Prefer depending on this interface in consumers rather than the concrete `RevolverViewModel` class.
+The public contract of a ViewModel. Code that uses a ViewModel can depend on this interface instead of the concrete class.
 
 | Member | Type | Description |
 |---|---|---|
-| `state` | `CStateFlow<STATE>` | Current view state. Always holds the last emitted value. |
-| `effect` | `CSharedFlow<EFFECT>` | One-shot side effects. Not replayed to late subscribers. |
-| `emit(event)` | `fun (EVENT)` | Dispatches an event for asynchronous processing. |
+| `state` | `CStateFlow<STATE>` | Current state. Always holds a value. |
+| `effect` | `CSharedFlow<EFFECT>` | One-shot effects. Not replayed. |
+| `emit(event)` | `(EVENT) -> Unit` | Queues an event for processing. |
 
----
+## `RevolverViewModel<EVENT, STATE, EFFECT>(initialState: STATE)`
 
-## RevolverViewModel
+`open class`. It implements `RevolverViewModelInterface` and extends `BaseViewModel`.
 
-```kotlin
-open class RevolverViewModel<EVENT, STATE, EFFECT>(
-    initialState: STATE,
-) : RevolverViewModelInterface<EVENT, STATE, EFFECT>, BaseViewModel()
-```
-
-Base class for all Revolver ViewModels. Handles event routing, error catching, and lifecycle management.
-
-**Constructor parameters:**
-
-| Parameter | Description |
+| Function | Behaviour |
 |---|---|
-| `initialState` | The state exposed by `state` before any event is processed. |
+| `addEventHandler<T : EVENT>(handler: EventHandler<T, STATE, EFFECT>)` | Registers the handler for event type `T`. Throws `IllegalStateException` if `T` already has a handler. |
+| `addErrorHandler<ERROR : Throwable>(handler: ErrorHandler<ERROR, STATE, EFFECT>)` | Registers a handler for exceptions of type `ERROR`. Handlers are tried in registration order, and the first match wins. Throws `IllegalStateException` if `ERROR` already has a handler. |
+| `addErrorHandler<ERROR : Throwable>(errorHandler: RevolverErrorHandler<STATE, EFFECT, ERROR>)` | Same as above, for a reusable handler object. |
+| `emit(event: EVENT)` | Puts the event on a 64-slot buffered channel. Events are handled one at a time, in order. Throws `IllegalStateException` if the channel can't accept the event. |
 
-**Methods:**
+`internalEventHandler` and `internalErrorHandler` are public only because the inline functions above call them. Don't call them directly.
 
-#### `addEventHandler`
-
-```kotlin
-inline fun <reified T : EVENT> addEventHandler(
-    noinline handler: EventHandler<T, STATE, EFFECT>
-)
-```
-
-Registers a suspend lambda as the handler for event type `T`. Call in `init`. Each type may have at most one handler.
-
-**Throws** `IllegalStateException` if a handler for `T` is already registered.
-
----
-
-#### `addErrorHandler` (lambda)
+## `RevolverErrorHandler<STATE, EFFECT, ERROR>`
 
 ```kotlin
-inline fun <reified ERROR : Throwable> addErrorHandler(
-    noinline handler: ErrorHandler<ERROR, STATE, EFFECT>
-)
+interface RevolverErrorHandler<STATE, EFFECT, ERROR> {
+    suspend fun handleError(exception: ERROR, emit: Emitter<STATE, EFFECT>)
+}
 ```
 
-Registers a suspend lambda as the handler for exception type `ERROR`. Handlers are matched in registration order.
+## `RevolverDefaultErrorHandler<STATE, EFFECT>(genericErrorState: STATE)`
 
-**Throws** `IllegalStateException` if a handler for `ERROR` is already registered.
+A `RevolverErrorHandler` for `Throwable`. It logs the exception through Napier at error level and emits `genericErrorState`.
 
----
+## `BaseViewModel`
 
-#### `addErrorHandler` (interface)
+`expect open class` that provides `viewModelScope: CoroutineScope`, running on `Dispatchers.Main`.
 
-```kotlin
-inline fun <reified ERROR : Throwable> addErrorHandler(
-    errorHandler: RevolverErrorHandler<STATE, EFFECT, ERROR>
-)
-```
-
-Registers a `RevolverErrorHandler` instance. Delegates to the lambda overload using `errorHandler::handleError`.
-
----
-
-#### `emit`
-
-```kotlin
-override fun emit(event: EVENT)
-```
-
-Sends an event to the ViewModel for asynchronous processing by its registered `EventHandler`.
-
-**Throws** `IllegalStateException` if the internal event channel cannot accept the event.
-
----
-
-## RevolverErrorHandler
-
-```kotlin
-interface RevolverErrorHandler<STATE, EFFECT, ERROR>
-```
-
-Interface for reusable error handlers shared across multiple ViewModels.
-
-#### `handleError`
-
-```kotlin
-suspend fun handleError(exception: ERROR, emit: Emitter<STATE, EFFECT>)
-```
-
-Called when an exception of type `ERROR` is caught by the ViewModel.
-
----
-
-## RevolverDefaultErrorHandler
-
-```kotlin
-class RevolverDefaultErrorHandler<STATE, EFFECT>(
-    genericErrorState: STATE,
-) : RevolverErrorHandler<STATE, EFFECT, Throwable>
-```
-
-Built-in catch-all handler that maps any `Throwable` directly to a fixed error state. Logs the exception via Napier at `ERROR` level.
-
-| Parameter | Description |
+| Platform | Lifecycle |
 |---|---|
-| `genericErrorState` | The state emitted whenever any exception is caught. |
+| Android | Extends AndroidX `ViewModel`. The scope is cancelled in `onCleared()`. |
+| iOS | Call `dispose()` to cancel the scope.[^ios-src] |
 
-```kotlin
-// Usage
-addErrorHandler(RevolverDefaultErrorHandler(MyState.Error("Something went wrong")))
-```
+## Flow wrappers
 
----
-
-## BaseViewModel
-
-```kotlin
-expect open class BaseViewModel()
-```
-
-Platform-specific base. Provides a `viewModelScope` tied to the platform lifecycle.
-
-| Platform | Lifecycle behaviour |
-|---|---|
-| Android | Backed by AndroidX `ViewModel`. Scope cancelled in `onCleared()`. |
-| iOS | Scope cancelled by calling `dispose()` manually. |
-
-| Member | Type | Description |
+| Type | Wraps | Exposed as |
 |---|---|---|
-| `viewModelScope` | `CoroutineScope` | Scope for all ViewModel coroutines. |
-| `dispose()` *(iOS only)* | `fun` | Cancels `viewModelScope`. Must be called from Swift `deinit`. |
+| `CFlow<T : Any>(flow, coroutineScope)` | `Flow<T>` | — |
+| `CSharedFlow<T : Any>(flow, coroutineScope)` | `SharedFlow<T>` | `effect` |
+| `CStateFlow<T : Any>(flow, coroutineScope)` | `StateFlow<T>` | `state` |
 
----
+Extension builders: `Flow<T>.cFlow()`, `SharedFlow<T>.cSharedFlow()` and `StateFlow<T>.cStateFlow()`. Each takes an optional `coroutineScope`, which defaults to `GlobalScope`.
 
-## Flow wrappers (`com.umain.revolver.flow`)
+On Android the wrappers just delegate to the wrapped flow. On iOS they add:
 
-These wrappers exist to provide a Swift-friendly API on iOS without exposing the full coroutines API to Objective-C/Swift.
+| Member | Description |
+|---|---|
+| `watch(onNext: (T) -> Unit): DisposableHandle` | Collects on `Dispatchers.Main` in the wrapper's scope. |
+| `interface DisposableHandle : kotlinx.coroutines.DisposableHandle` | `dispose()` cancels the observation. |
+| `operator fun DisposableHandle.plus(other)` | Returns a handle that disposes both. |
 
-### `CFlow<T>`
+See [iOS integration](ios-integration.md) for usage.
 
-```kotlin
-expect class CFlow<out T : Any>(
-    flow: Flow<T>,
-    coroutineScope: CoroutineScope,
-) : Flow<T>
-```
-
-Platform-aware `Flow` wrapper. On iOS adds `watch(onNext)`.
-
-#### `watch` *(iOS only)*
-
-```kotlin
-fun watch(onNext: (T) -> Unit): DisposableHandle
-```
-
-Subscribes to the flow from Swift on the main dispatcher. Returns a `DisposableHandle` to cancel the subscription.
-
-#### Extension: `cFlow`
-
-```kotlin
-fun <T : Any> Flow<T>.cFlow(coroutineScope: CoroutineScope = GlobalScope): CFlow<T>
-```
-
----
-
-### `CSharedFlow<T>`
-
-```kotlin
-expect open class CSharedFlow<out T : Any>(
-    flow: SharedFlow<T>,
-    coroutineScope: CoroutineScope,
-) : SharedFlow<T>
-```
-
-Platform-aware `SharedFlow` wrapper. Exposed as `RevolverViewModelInterface.effect`. On iOS inherits `watch`.
-
-#### Extension: `cSharedFlow`
-
-```kotlin
-fun <T : Any> SharedFlow<T>.cSharedFlow(coroutineScope: CoroutineScope = GlobalScope): CSharedFlow<T>
-```
-
----
-
-### `CStateFlow<T>`
-
-```kotlin
-expect open class CStateFlow<out T : Any>(
-    flow: StateFlow<T>,
-    coroutineScope: CoroutineScope,
-) : StateFlow<T>
-```
-
-Platform-aware `StateFlow` wrapper. Always holds the latest `value`. Exposed as `RevolverViewModelInterface.state`. On iOS inherits `watch`.
-
-#### Extension: `cStateFlow`
-
-```kotlin
-fun <T : Any> StateFlow<T>.cStateFlow(coroutineScope: CoroutineScope = GlobalScope): CStateFlow<T>
-```
-
----
-
-### `DisposableHandle` *(iOS only)*
-
-```kotlin
-interface DisposableHandle : kotlinx.coroutines.DisposableHandle
-```
-
-A cancellation handle for a running flow observation. Obtained from `CFlow.watch`. Always cancel in Swift `deinit`.
-
-#### `dispose()`
-
-```kotlin
-fun dispose()
-```
-
-Cancels the underlying coroutine job.
-
-#### `operator fun DisposableHandle.plus(other: DisposableHandle): DisposableHandle`
-
-Combines two handles into one. Calling `dispose()` on the result disposes both.
-
-```swift
-let handle = stateHandle + effectHandle
-// later:
-handle.dispose()
-```
+[^common-src]: commonMain sources
+[^ios-src]: iosMain sources

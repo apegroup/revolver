@@ -134,7 +134,7 @@ open class RevolverViewModel<EVENT : RevolverEvent, STATE : RevolverState, EFFEC
 
     /** @suppress Internal use only. */
     fun internalErrorHandler(type: KClass<*>, handler: EventHandler<Throwable, STATE, EFFECT>) {
-        if (eventHandlers.containsKey(type)) {
+        if (errorHandlers.containsKey(type)) {
             throw IllegalStateException("only one ErrorHandler can be registered for $type")
         }
 
