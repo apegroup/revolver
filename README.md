@@ -72,7 +72,7 @@ sealed class ExampleEffect : RevolverEffect {
 }
 ```
 
-> Prefer `object` for states with no data and `data class` for states that carry data. Avoid plain `class` for states — it can prevent state updates from being emitted when the value does not change.
+> Prefer `object` for states with no data and `data class` for states that carry data. The state flow skips values equal to the current one, so structural equality avoids redundant updates.
 
 ### 2. Implement your ViewModel
 
@@ -104,16 +104,16 @@ class ExampleViewModel : RevolverViewModel<ExampleEvent, ExampleState, ExampleEf
 @Composable
 fun ExampleScreen(viewModel: ExampleViewModel) {
     val state by viewModel.state.collectAsState()
+    val context = LocalContext.current
 
     LaunchedEffect(Unit) {
+        viewModel.emit(ExampleEvent.Refresh)
         viewModel.effect.collect { effect ->
             when (effect) {
                 is ExampleEffect.ShowToast -> Toast.makeText(context, effect.message, Toast.LENGTH_SHORT).show()
             }
         }
     }
-
-    viewModel.emit(ExampleEvent.Refresh)
 
     when (val s = state) {
         is ExampleState.Loading -> CircularProgressIndicator()
@@ -123,166 +123,27 @@ fun ExampleScreen(viewModel: ExampleViewModel) {
 }
 ```
 
-<br/>
-
-## Error Handling
-
-All exceptions that escape an `EventHandler` are caught by the ViewModel and routed to a registered `ErrorHandler`. You should always register at least one.
-
-**Registration order matters** — handlers are matched in the order they were registered. Register more specific exception types before generic ones.
-
-```kotlin
-init {
-    addErrorHandler<NetworkException>(::onNetworkError)   // matched first
-    addErrorHandler<Exception>(::onGenericError)          // fallback
-}
-
-private suspend fun onNetworkError(
-    exception: NetworkException,
-    emit: Emitter<ExampleState, ExampleEffect>,
-) {
-    emit.state(ExampleState.Error("No connection"))
-}
-
-private suspend fun onGenericError(
-    exception: Exception,
-    emit: Emitter<ExampleState, ExampleEffect>,
-) {
-    emit.state(ExampleState.Error("Unexpected error"))
-}
-```
-
-### Reusable error handlers
-
-Implement `RevolverErrorHandler` to share error logic across multiple ViewModels:
-
-```kotlin
-class NetworkErrorHandler<STATE : RevolverState, EFFECT : RevolverEffect>(
-    private val offlineState: STATE,
-) : RevolverErrorHandler<STATE, EFFECT, NetworkException> {
-
-    override suspend fun handleError(exception: NetworkException, emit: Emitter<STATE, EFFECT>) {
-        emit.state(offlineState)
-    }
-}
-
-// In any ViewModel:
-init {
-    addErrorHandler(NetworkErrorHandler(ExampleState.Error("No connection")))
-}
-```
-
-For a zero-configuration fallback that maps **any** exception to a single error state, use the built-in `RevolverDefaultErrorHandler`:
-
-```kotlin
-init {
-    addErrorHandler(RevolverDefaultErrorHandler(ExampleState.Error("Something went wrong")))
-}
-```
+For iOS, see [iOS integration](docs/ios-integration.md).
 
 <br/>
 
-## iOS Integration
+## Documentation
 
-The library exposes `CStateFlow`, `CSharedFlow`, and `CFlow` wrappers that are callable from Swift without importing the full coroutines API.
+The [`docs/`](docs/index.md) directory is an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle: plain markdown with YAML frontmatter that people and AI agents can both read.
 
-Use `watch(onNext:)` to observe a flow from Swift. It returns a `DisposableHandle` that **must** be cancelled when the observer is deallocated.
-
-```swift
-class ExampleObservableViewModel: ObservableObject {
-    @Published var state: ExampleState = ExampleState.Loading()
-
-    private let viewModel = ExampleViewModel()
-    private var stateHandle: DisposableHandle?
-    private var effectHandle: DisposableHandle?
-
-    init() {
-        stateHandle = viewModel.state.watch { [weak self] state in
-            self?.state = state
-        }
-        effectHandle = viewModel.effect.watch { [weak self] effect in
-            // handle effect
-        }
-        viewModel.emit(event: ExampleEvent.Refresh())
-    }
-
-    deinit {
-        stateHandle?.dispose()
-        effectHandle?.dispose()
-    }
-}
-```
-
-You can also combine multiple `DisposableHandle` instances with `+`:
-
-```swift
-let handle = stateHandle + effectHandle
-// later:
-handle.dispose()
-```
-
-Call `viewModel.dispose()` to cancel the underlying coroutine scope on iOS (Android handles this automatically via the `ViewModel` lifecycle).
-
-<br/>
-
-## Testing
-
-Because all logic lives in `commonMain` and states are immutable, ViewModels can be tested in pure Kotlin without any client dependency.
-
-**Recommended libraries** (already included in `commonTest`):
-- [Turbine](https://github.com/cashapp/turbine) — Flow assertion DSL
-- [Mockative](https://github.com/mockative/mockative) — KMP-compatible mocking
-- `kotlin.test` + `kotlinx.coroutines.test`
-
-```kotlin
-@OptIn(ExperimentalCoroutinesApi::class)
-internal class ExampleViewModelTests {
-
-    @Mock
-    private val repository = mock(classOf<ExampleRepository>())
-
-    @BeforeTest
-    fun setup() {
-        Dispatchers.setMain(StandardTestDispatcher())
-    }
-
-    @AfterTest
-    fun dispose() {
-        Dispatchers.resetMain()
-    }
-
-    @Test
-    fun onRefreshEmitsLoadingThenLoaded() = runTest {
-        given(repository).coroutine { fetchData() }.thenReturn("testData")
-
-        val viewModel = ExampleViewModel(repository, initialState = ExampleState.Loading)
-
-        viewModel.state.test {
-            viewModel.emit(ExampleEvent.Refresh)
-
-            assertIs<ExampleState.Loading>(awaitItem())
-            val loaded = assertIs<ExampleState.Loaded>(awaitItem())
-            assertEquals("testData", loaded.result)
-        }
-    }
-
-    @Test
-    fun onRefreshEmitsShowToastEffect() = runTest {
-        given(repository).coroutine { fetchData() }.thenReturn("testData")
-
-        val viewModel = ExampleViewModel(repository, initialState = ExampleState.Loading)
-
-        viewModel.effect.test {
-            viewModel.emit(ExampleEvent.Refresh)
-            val effect = assertIs<ExampleEffect.ShowToast>(awaitItem())
-            assertEquals("Loaded!", effect.message)
-        }
-    }
-}
-```
+| Page | Covers |
+|---|---|
+| [Getting started](docs/getting-started.md) | Installation, platform support, first ViewModel |
+| [Core concepts](docs/concepts.md) | Event, State, Effect, Emitter, and runtime behaviour |
+| [Error handling](docs/error-handling.md) | Built-in, per-type and reusable error handlers |
+| [Testing](docs/testing.md) | Testing ViewModels with Turbine and kotlinx-coroutines-test |
+| [iOS integration](docs/ios-integration.md) | `watch`, `DisposableHandle`, SwiftUI and UIKit patterns |
+| [API reference](docs/api-reference.md) | Every public type and function |
 
 <br/>
 
 ## Contribution
 
 Bug reports, feature requests, and pull requests are welcome. This library is in active development — production use is at your own discretion.
+
+Run the test suite with `./scripts/run_test_suite.sh`, and publish to your local Maven repository with `./scripts/build_deploy_to_local_maven.sh`.

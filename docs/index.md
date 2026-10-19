@@ -1,54 +1,26 @@
-# Revolver Documentation
-
-Revolver is an immutable, event-based state management framework for Kotlin Multiplatform. It enforces unidirectional data flow and a single source of truth for application state.
-
+---
+okf_version: "0.2"
 ---
 
-## Contents
+# Revolver documentation
 
-| Document | Description |
-|---|---|
-| [Getting Started](getting-started.md) | Installation, minimum requirements, and your first ViewModel |
-| [Core Concepts](concepts.md) | Event, State, Effect, ViewModel, and Emitter explained |
-| [Error Handling](error-handling.md) | Built-in and custom error handlers, registration order |
-| [Testing](testing.md) | Unit testing with Turbine and Mockative |
-| [iOS Integration](ios-integration.md) | Swift observation patterns, DisposableHandle, lifecycle |
-| [API Reference](api-reference.md) | Complete public API listing |
+This directory is an [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) (OKF v0.2) bundle. Every page is plain markdown with YAML frontmatter, so people can read it on GitHub and agents can parse it without extra tooling.
 
----
+# Guides
 
-## How it works
+* [Getting started](getting-started.md) - Install Revolver, then build and connect your first ViewModel on Android and iOS.
+* [Error handling](error-handling.md) - Catch exceptions from event handlers and map them to states and effects.
+* [Testing](testing.md) - Unit test ViewModels in `commonTest` with Turbine and kotlinx-coroutines-test.
+* [iOS integration](ios-integration.md) - Observe state and effects from Swift with `watch`, and manage the ViewModel lifecycle.
 
-```
-Client ──emit(Event)──► RevolverViewModel ──► EventHandler
-                                                   │
-                             ┌─────────────────────┤
-                             ▼                     ▼
-                       StateFlow<State>    SharedFlow<Effect>
-                             │                     │
-                             └──────────► Client ◄─┘
-```
+# Concepts
 
-| Type | Direction | Purpose |
-|---|---|---|
-| `RevolverEvent` | Client → ViewModel | User actions or lifecycle triggers |
-| `RevolverState` | ViewModel → Client | Immutable snapshot of what to display |
-| `RevolverEffect` | ViewModel → Client | One-shot side effect (navigation, toast, etc.) |
+* [Core concepts](concepts.md) - Events, states, effects, the ViewModel and the emitter, plus how events and errors are processed at runtime.
 
----
+# Reference
 
-## Quick install
+* [API reference](api-reference.md) - Every public type and function in `com.umain.revolver` and `com.umain.revolver.flow`.
 
-```kotlin
-// settings.gradle.kts
-maven {
-    url = uri("https://maven.pkg.github.com/apegroup/revolver/")
-    credentials {
-        username = System.getenv("GH_USERNAME") ?: ""
-        password = System.getenv("GH_TOKEN") ?: ""
-    }
-}
+# History
 
-// build.gradle.kts — commonMain
-implementation("com.umain:revolver:1.6.0")
-```
+* [Update log](log.md) - Changes to this documentation bundle.

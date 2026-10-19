@@ -1,22 +1,42 @@
-# Core Concepts
-
-Revolver is built around three primitives and a single rule: **data flows in one direction**.
-
-```
-Client ──emit(Event)──► ViewModel ──► EventHandler
-                                           │
-                         ┌─────────────────┤
-                         ▼                 ▼
-                   StateFlow<State>  SharedFlow<Effect>
-                         │                 │
-                         └──────► Client ◄─┘
-```
-
 ---
+type: Concept
+title: Core concepts
+description: Events, states, effects, the ViewModel and the emitter, plus how events and errors are processed at runtime.
+tags: [architecture, event, state, effect, viewmodel]
+status: stable
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+sources:
+  - id: viewmodel-src
+    resource: https://github.com/apegroup/revolver/blob/main/revolver/src/commonMain/kotlin/com/umain/revolver/RevolverViewModel.kt
+    title: RevolverViewModel.kt
+  - id: types-src
+    resource: https://github.com/apegroup/revolver/blob/main/revolver/src/commonMain/kotlin/com/umain/revolver/Types.kt
+    title: Types.kt
+---
+
+# Core concepts
+
+Revolver follows one rule: **data flows in one direction**. Clients send events in. The ViewModel sends states and effects out.
+
+```
+Client ──emit(Event)──► RevolverViewModel ──► EventHandler
+                                                   │
+                             ┌─────────────────────┤
+                             ▼                     ▼
+                       StateFlow<State>    SharedFlow<Effect>
+                             │                     │
+                             └──────► Client ◄─────┘
+```
+
+| Type | Direction | Purpose |
+|---|---|---|
+| `RevolverEvent` | Client → ViewModel | A user action or lifecycle trigger |
+| `RevolverState` | ViewModel → Client | An immutable snapshot of what to display |
+| `RevolverEffect` | ViewModel → Client | A one-shot side effect, such as navigation or a toast |
 
 ## Event
 
-An `Event` is a message sent **from the client to the ViewModel**. It describes something that happened — a user action, a lifecycle callback, or a timer firing.
+An event says that something happened: a tap, a screen appearing, a timer firing. Model events as a sealed class that implements `RevolverEvent`, and register exactly one handler for each subtype.
 
 ```kotlin
 sealed class SearchEvent : RevolverEvent {
@@ -25,17 +45,9 @@ sealed class SearchEvent : RevolverEvent {
 }
 ```
 
-**Rules:**
-- Implement `RevolverEvent`
-- Model as a sealed class
-- Each subtype must have exactly one registered `EventHandler` in the ViewModel
-- Events carry only what the handler needs — avoid passing pre-computed data
-
----
-
 ## State
 
-A `State` describes what the UI should render **right now**. It is immutable; the ViewModel never mutates a state object — it replaces it entirely.
+A state is a complete description of what the UI should render right now. The ViewModel never mutates a state. It replaces the whole value.
 
 ```kotlin
 sealed class SearchState : RevolverState {
@@ -46,43 +58,21 @@ sealed class SearchState : RevolverState {
 }
 ```
 
-**Rules:**
-- Implement `RevolverState`
-- Model as a sealed class
-- Use `object` for states with no data, `data class` for states with a payload
-- **Do not use plain `class`** — it disables structural equality, which can prevent `StateFlow` from emitting when you set the same logical state twice
-- States must be complete — the client should need nothing else to render the UI
-
----
+Use `object` for states with no data and `data class` for states with a payload. `state` is a `StateFlow`, which skips any value equal to the current one. With `data class`, setting the same logical state twice is a no-op. A plain `class` compares by identity, so every call to `emit.state` reaches the UI even when nothing changed.
 
 ## Effect
 
-An `Effect` is a **one-shot notification** to the client: navigate, show a toast, trigger haptics. Unlike state, an effect is not retained — a late subscriber will not receive it.
+An effect is a one-shot instruction to the client, such as navigating, showing a toast or triggering haptics. Effects are not stored. A collector that subscribes late never sees earlier effects. Don't put view state in an effect; that belongs in `State`.
 
 ```kotlin
 sealed class SearchEffect : RevolverEffect {
     data class NavigateToDetail(val id: String) : SearchEffect()
-    data class ShowError(val message: String) : SearchEffect()
 }
 ```
 
-**Rules:**
-- Implement `RevolverEffect`
-- Model as a sealed class
-- Use for events that happen **once** and must not be replayed (navigation, one-time toasts)
-- Do not encode current view state in effects — that is what `State` is for
-
----
-
 ## ViewModel
 
-`RevolverViewModel` is the central piece. It:
-
-1. Holds `state: CStateFlow<STATE>` — always has a value, replayed to new subscribers
-2. Holds `effect: CSharedFlow<EFFECT>` — delivered once per subscriber, not replayed
-3. Accepts events via `emit(event)` — queued into a buffered channel
-4. Routes each event to its registered `EventHandler` in a coroutine
-5. Catches all exceptions and routes them to a registered `ErrorHandler`
+Extend `RevolverViewModel<EVENT, STATE, EFFECT>`, pass an `initialState`, and register handlers in `init`:
 
 ```kotlin
 class SearchViewModel(
@@ -101,8 +91,7 @@ class SearchViewModel(
         emit: Emitter<SearchState, SearchEffect>,
     ) {
         emit.state(SearchState.Loading)
-        val results = repository.search(event.query)
-        emit.state(SearchState.Results(results))
+        emit.state(SearchState.Results(repository.search(event.query)))
     }
 
     private suspend fun onClear(
@@ -114,34 +103,32 @@ class SearchViewModel(
 }
 ```
 
----
+It exposes `state: CStateFlow<STATE>`, `effect: CSharedFlow<EFFECT>` and `emit(event)`. On Android it extends AndroidX `ViewModel`. On iOS you call `dispose()` yourself (see [iOS integration](ios-integration.md)).
 
 ## Emitter
 
-The `Emitter<STATE, EFFECT>` is passed into every `EventHandler` and `ErrorHandler`. It is the only way to push new values from inside a handler:
+Every event handler and error handler receives an `Emitter<STATE, EFFECT>`. It is the only way to publish from inside a handler.
 
-| Function | What it does |
+| Call | Effect |
 |---|---|
-| `emit.state(newState)` | Replaces the current state synchronously |
-| `emit.effect(newEffect)` | Broadcasts a one-shot effect asynchronously |
+| `emit.state(newState)` | Sets the current state immediately. |
+| `emit.effect(newEffect)` | Launches a coroutine that delivers the effect to current collectors. |
 
-A handler may call `emit.state(...)` multiple times to produce intermediate states (e.g. `Loading` → `Loaded`). Each call is observed immediately by subscribers.
+A handler can call `emit.state` several times to show intermediate states, for example `Loading` then `Results`.
 
----
+## Runtime behaviour
 
-## Handler registration order
+These rules come straight from the implementation.[^viewmodel-src]
 
-Both `addEventHandler` and `addErrorHandler` use a `Map<KClass<*>, Handler>`, so:
+- **Events are processed one at a time, in order.** `emit` puts the event on a buffered channel, and a single collector runs the matching handlers one after another. A handler that suspends, for example on a network call, holds back every event behind it. To run work in parallel, launch it in `viewModelScope` from the handler.
+- **`emit` throws if the buffer is full.** The channel holds 64 pending events. If it can't accept another, `emit` throws `IllegalStateException`.
+- **An event without a handler is an error.** The ViewModel throws `IllegalStateException`, which goes through the error handlers like any other exception.
+- **Error handlers are matched in registration order.** The first handler whose type matches the exception (`isInstance`) wins. Register specific types before general ones.
+- **Unmatched exceptions are dropped.** The ViewModel logs them through Napier at warning level and continues. Always register a catch-all, such as `RevolverDefaultErrorHandler`.
+- **Effects with no collector are lost.** `effect` is a `SharedFlow` with no replay, so if nothing is collecting when an effect is emitted, it is discarded.
+- **Each type gets one handler.** Registering a second event handler or error handler for the same type throws `IllegalStateException`.
 
-- Each event/exception type can have **at most one** handler
-- For error handlers, matching is done in **insertion order** — register specific subtypes before base types:
+The handler signatures are defined as type aliases.[^types-src] See the [API reference](api-reference.md) for the complete list.
 
-```kotlin
-init {
-    addErrorHandler<NetworkException>(::onNetworkError)  // checked first
-    addErrorHandler<IOException>(::onIOError)            // checked second
-    addErrorHandler<Exception>(::onGenericError)         // fallback
-}
-```
-
-If a thrown exception matches `NetworkException`, the `IOException` and `Exception` handlers are never invoked.
+[^viewmodel-src]: RevolverViewModel.kt
+[^types-src]: Types.kt

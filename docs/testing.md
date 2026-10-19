@@ -1,217 +1,129 @@
+---
+type: Guide
+title: Testing
+description: Unit test ViewModels in commonTest with Turbine and kotlinx-coroutines-test.
+tags: [testing, turbine, coroutines]
+status: stable
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+sources:
+  - id: library-tests
+    resource: https://github.com/apegroup/revolver/blob/main/revolver/src/commonTest/kotlin/com/umain/revolver/TestViewModelTests.kt
+    title: Revolver's own ViewModel tests
+---
+
 # Testing
 
-Because all business logic lives in `commonMain` and states are immutable value types, Revolver ViewModels can be tested as pure Kotlin unit tests — no Android emulator, no iOS simulator, no UI harness needed.
+ViewModel logic lives in `commonMain`, so you can test it as plain Kotlin unit tests without an emulator, a simulator or any UI.
 
----
+## Dependencies
 
-## Tools
+Add these to your project's `commonTest` source set:
 
-All testing dependencies are already included in `commonTest`:
-
-| Library | Purpose |
+| Library | Use |
 |---|---|
-| [Turbine](https://github.com/cashapp/turbine) | Assertion DSL for Kotlin Flows |
-| [Mockative](https://github.com/mockative/mockative) | KMP-compatible mocking via `@Mock` |
-| `kotlin.test` | `@Test`, `assertIs`, `assertEquals`, `assertFailsWith` |
-| `kotlinx.coroutines.test` | `runTest`, `StandardTestDispatcher`, `Dispatchers.setMain` |
+| `kotlin("test")` | `@Test`, `assertIs`, `assertEquals` |
+| `org.jetbrains.kotlinx:kotlinx-coroutines-test` | `runTest`, `StandardTestDispatcher`, `Dispatchers.setMain` |
+| `app.cash.turbine:turbine` | `test { awaitItem() }` for asserting on flows |
 
----
+A hand-written fake is usually enough for dependencies. Use a KMP mocking library such as Mockative if you need one.
 
-## Test class setup
+## Setup
 
-Replace the main dispatcher with a `StandardTestDispatcher` so coroutines are deterministic:
+The ViewModel scope runs on `Dispatchers.Main`, which is read when the ViewModel is created. Install a test dispatcher before you construct the ViewModel:
 
 ```kotlin
 @OptIn(ExperimentalCoroutinesApi::class)
-internal class MyViewModelTests {
-
-    @Mock
-    private val repository = mock(classOf<MyRepository>())
+class SearchViewModelTests {
 
     @BeforeTest
-    fun setup() {
-        Dispatchers.setMain(StandardTestDispatcher())
-    }
+    fun setup() = Dispatchers.setMain(StandardTestDispatcher())
 
     @AfterTest
-    fun teardown() {
-        Dispatchers.resetMain()
-    }
+    fun tearDown() = Dispatchers.resetMain()
 }
 ```
 
----
+## Asserting states
 
-## Testing state flows
-
-Use Turbine's `test { }` block to assert each emitted state in order.
+`state` is a `StateFlow`, so the first item Turbine receives is the **current** state:
 
 ```kotlin
 @Test
-fun loadEmitsLoadingThenResults() = runTest {
-    given(repository).coroutine { fetchItems() }.thenReturn(listOf("a", "b"))
-
-    val viewModel = MyViewModel(repository)
+fun queryChangedEmitsLoadingThenResults() = runTest {
+    val viewModel = SearchViewModel(FakeSearchRepository(results = listOf("a", "b")))
 
     viewModel.state.test {
-        viewModel.emit(MyEvent.Load)
+        viewModel.emit(SearchEvent.QueryChanged("kotlin"))
 
-        assertIs<MyState.Loading>(awaitItem())
-        val results = assertIs<MyState.Results>(awaitItem())
-        assertEquals(listOf("a", "b"), results.items)
+        assertIs<SearchState.Idle>(awaitItem())    // initial state
+        assertIs<SearchState.Loading>(awaitItem())
+        assertEquals(listOf("a", "b"), assertIs<SearchState.Results>(awaitItem()).items)
+    }
+}
+
+class FakeSearchRepository(private val results: List<String>) : SearchRepository {
+    override suspend fun search(query: String): List<String> {
+        delay(10) // suspend so the intermediate Loading state can be observed
+        return results
     }
 }
 ```
 
-> **Tip**: `awaitItem()` suspends until the next item is emitted or the test times out. The default timeout is 1 second; increase it with `test(timeout = 5.seconds) { }` for slow operations.
+`StateFlow` conflates values. If a handler sets two states without suspending in between, a collector can miss the first one. Either make the fake suspend, as above, or assert only on the final state.
 
----
-
-## Testing effects
-
-The `effect` flow is tested the same way. Combine with state assertions when needed:
+## Asserting effects
 
 ```kotlin
 @Test
-fun submitEmitsSuccessEffect() = runTest {
-    given(repository).coroutine { submit(any()) }.thenReturn(Unit)
-
-    val viewModel = MyViewModel(repository)
+fun resetEmitsConfirmation() = runTest {
+    val viewModel = CounterViewModel()
 
     viewModel.effect.test {
-        viewModel.emit(MyEvent.Submit("payload"))
-
-        val effect = assertIs<MyEffect.ShowSuccess>(awaitItem())
-        assertEquals("Done!", effect.message)
+        viewModel.emit(CounterEvent.Reset)
+        assertIs<CounterEffect.ResetConfirmed>(awaitItem())
     }
 }
 ```
 
----
+Start collecting before you emit. Effects emitted while nothing is collecting are lost.
 
-## Testing error handling
+## Error paths
 
-Throw from the mock to exercise error paths:
+Make the fake throw, then assert the state the error handler produces:
 
 ```kotlin
 @Test
-fun loadNetworkErrorEmitsOfflineState() = runTest {
-    given(repository).coroutine { fetchItems() }.thenThrow(NetworkException())
-
-    val viewModel = MyViewModel(repository)
+fun networkErrorEmitsOfflineState() = runTest {
+    val viewModel = SearchViewModel(FailingSearchRepository(NetworkException()))
 
     viewModel.state.test {
-        viewModel.emit(MyEvent.Load)
+        viewModel.emit(SearchEvent.QueryChanged("kotlin"))
 
-        assertIs<MyState.Loading>(awaitItem())
-        assertIs<MyState.Offline>(awaitItem())
+        assertIs<SearchState.Idle>(awaitItem())
+        assertIs<SearchState.Loading>(awaitItem())
+        assertIs<SearchState.Offline>(awaitItem())
+    }
+}
+
+class FailingSearchRepository(private val error: Throwable) : SearchRepository {
+    override suspend fun search(query: String): List<String> {
+        delay(10)
+        throw error
     }
 }
 ```
 
----
+## Starting from a specific state
 
-## Testing intermediate states
-
-When a handler emits multiple states (e.g. `Loading` → `Loaded`), assert them all in order:
+`initialState` is a constructor parameter of `RevolverViewModel`. If your ViewModel forwards it, tests can start from any state without first running other handlers:
 
 ```kotlin
-@Test
-fun refreshEmitsLoadingThenLoaded() = runTest {
-    given(repository).coroutine { fetchData() }.thenReturn("result")
-
-    val viewModel = MyViewModel(repository)
-
-    viewModel.state.test {
-        viewModel.emit(MyEvent.Refresh)
-
-        assertIs<MyState.Loading>(awaitItem())       // first emission
-        val loaded = assertIs<MyState.Loaded>(awaitItem()) // second emission
-        assertEquals("result", loaded.data)
-    }
-}
+class SearchViewModel(
+    private val repository: SearchRepository,
+    initialState: SearchState = SearchState.Idle,
+) : RevolverViewModel<SearchEvent, SearchState, SearchEffect>(initialState)
 ```
 
----
+Revolver's own test suite has more examples.[^library-tests]
 
-## Overriding the initial state
-
-`RevolverViewModel` takes an `initialState` constructor parameter. Pass it directly in tests to start from a known state without triggering any handler:
-
-```kotlin
-val viewModel = MyViewModel(
-    repository = repository,
-    initialState = MyState.Results(listOf("existing")),
-)
-```
-
-This pattern is useful when testing handlers that depend on the current state value.
-
----
-
-## Overriding the coroutine scope
-
-`CreateViewModelScope` can be replaced for finer-grained coroutine control in tests. The test dispatcher installed via `Dispatchers.setMain` is picked up automatically when using `StandardTestDispatcher`.
-
----
-
-## Complete example
-
-```kotlin
-@OptIn(ExperimentalCoroutinesApi::class)
-internal class SearchViewModelTests {
-
-    @Mock
-    private val repository = mock(classOf<SearchRepository>())
-
-    @BeforeTest
-    fun setup() {
-        Dispatchers.setMain(StandardTestDispatcher())
-    }
-
-    @AfterTest
-    fun teardown() {
-        Dispatchers.resetMain()
-    }
-
-    @Test
-    fun queryChangedEmitsLoadingThenResults() = runTest {
-        given(repository).coroutine { search("kotlin") }.thenReturn(listOf("Kotlin Docs", "KMP Guide"))
-
-        val viewModel = SearchViewModel(repository)
-
-        viewModel.state.test {
-            viewModel.emit(SearchEvent.QueryChanged("kotlin"))
-
-            assertIs<SearchState.Loading>(awaitItem())
-            val results = assertIs<SearchState.Results>(awaitItem())
-            assertEquals(2, results.items.size)
-        }
-    }
-
-    @Test
-    fun clearResultsRestoresIdleState() = runTest {
-        val viewModel = SearchViewModel(repository, initialState = SearchState.Results(listOf("item")))
-
-        viewModel.state.test {
-            viewModel.emit(SearchEvent.ClearResults)
-
-            assertIs<SearchState.Idle>(awaitItem())
-        }
-    }
-
-    @Test
-    fun networkErrorEmitsOfflineState() = runTest {
-        given(repository).coroutine { search(any()) }.thenThrow(NetworkException())
-
-        val viewModel = SearchViewModel(repository)
-
-        viewModel.state.test {
-            viewModel.emit(SearchEvent.QueryChanged("kotlin"))
-
-            assertIs<SearchState.Loading>(awaitItem())
-            assertIs<SearchState.Offline>(awaitItem())
-        }
-    }
-}
-```
+[^library-tests]: Revolver's own ViewModel tests

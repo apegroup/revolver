@@ -13,6 +13,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
 import kotlin.test.assertNotEquals
 
@@ -236,6 +237,30 @@ class TestViewModelTests {
 
             // Then
             assertEquals(MyRevolverState.GenericErrorRevolverState(CommonErrorRevolverState.UnknownError), errorState)
+        }
+    }
+
+    @Test
+    fun testDuplicateErrorHandlerThrows() {
+        // Given
+        val viewModel = MyRevolverViewModel()
+
+        // When / Then
+        assertFailsWith<IllegalStateException> {
+            viewModel.addErrorHandler { _: Exception1, emit -> emit.state(MyRevolverState.FirstRevolverState) }
+        }
+    }
+
+    @Test
+    fun testDuplicateEventHandlerThrows() {
+        // Given
+        val viewModel = MyRevolverViewModel()
+
+        // When / Then
+        assertFailsWith<IllegalStateException> {
+            viewModel.addEventHandler<MyRevolverEvent.FirstRevolverEvent> { _, emit ->
+                emit.state(MyRevolverState.SecondRevolverState)
+            }
         }
     }
 }
