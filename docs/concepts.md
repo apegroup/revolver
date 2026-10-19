@@ -4,7 +4,7 @@ title: Core concepts
 description: Events, states, effects, the ViewModel and the emitter, plus how events and errors are processed at runtime.
 tags: [architecture, event, state, effect, viewmodel]
 status: stable
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T22:05:00Z }
 sources:
   - id: viewmodel-src
     resource: https://github.com/apegroup/revolver/blob/main/revolver/src/commonMain/kotlin/com/umain/revolver/RevolverViewModel.kt
@@ -103,7 +103,7 @@ class SearchViewModel(
 }
 ```
 
-It exposes `state: CStateFlow<STATE>`, `effect: CSharedFlow<EFFECT>` and `emit(event)`. On Android it extends AndroidX `ViewModel`. On iOS you call `dispose()` yourself (see [iOS integration](ios-integration.md)).
+It exposes `state: CStateFlow<STATE>`, `effect: CSharedFlow<EFFECT>` and `emit(event)`. It also exposes `stateFlow` and `effectFlow`: the same streams typed as plain `StateFlow` and `SharedFlow`, for Swift export. On Android it extends AndroidX `ViewModel`. On iOS you call `dispose()` yourself (see [iOS integration](ios-integration.md)).
 
 ## Emitter
 

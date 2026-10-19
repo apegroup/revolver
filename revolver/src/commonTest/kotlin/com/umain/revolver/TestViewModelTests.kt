@@ -1,21 +1,28 @@
 package com.umain.revolver
 
 import app.cash.turbine.test
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.test.StandardTestDispatcher
-import kotlinx.coroutines.test.resetMain
-import kotlinx.coroutines.test.runTest
-import kotlinx.coroutines.test.setMain
+import com.umain.revolver.flow.CSharedFlow
+import com.umain.revolver.flow.CStateFlow
+import com.umain.revolver.flow.cSharedFlow
+import com.umain.revolver.flow.cStateFlow
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertIs
+import kotlin.test.assertIsNot
 import kotlin.test.assertNotEquals
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
 
 sealed class MyRevolverState : RevolverState {
     object InitialRevolverState : MyRevolverState()
@@ -262,5 +269,69 @@ class TestViewModelTests {
                 emit.state(MyRevolverState.SecondRevolverState)
             }
         }
+    }
+
+    @Test
+    fun testStateFlowMirrorsState() = runTest {
+        // Given
+        val viewModel = MyRevolverViewModel()
+        viewModel.stateFlow.test {
+            // When
+            viewModel.emit(MyRevolverEvent.FirstRevolverEvent)
+
+            // Then
+            assertIs<MyRevolverState.InitialRevolverState>(awaitItem())
+            assertIs<MyRevolverState.FirstRevolverState>(awaitItem())
+            assertEquals(viewModel.state.value, viewModel.stateFlow.value)
+        }
+    }
+
+    @Test
+    fun testEffectFlowDeliversEffects() = runTest {
+        // Given
+        val viewModel = MyRevolverViewModel()
+        viewModel.effectFlow.test {
+            // When
+            viewModel.emit(MyRevolverEvent.TriggerEffectRevolverEvent)
+
+            // Then
+            assertIs<MyRevolverEffect.FirstRevolverEffect>(awaitItem())
+        }
+    }
+
+    @Test
+    fun testPlainFlowsAreNotWrappers() {
+        // Swift export can only bridge flows that are not CFlow wrapper instances.
+        val viewModel = MyRevolverViewModel()
+        val fake = FakeRevolverViewModel()
+
+        assertIsNot<CStateFlow<*>>(viewModel.stateFlow)
+        assertIsNot<CSharedFlow<*>>(viewModel.effectFlow)
+        assertIsNot<CStateFlow<*>>(fake.stateFlow)
+        assertIsNot<CSharedFlow<*>>(fake.effectFlow)
+    }
+
+    @Test
+    fun testInterfaceDefaultStateFlowMirrorsState() = runTest {
+        // Given
+        val fake = FakeRevolverViewModel()
+        fake.stateFlow.test {
+            // When
+            fake.emit(MyRevolverEvent.FirstRevolverEvent)
+
+            // Then
+            assertIs<MyRevolverState.InitialRevolverState>(awaitItem())
+            assertIs<MyRevolverState.FirstRevolverState>(awaitItem())
+        }
+    }
+}
+
+private class FakeRevolverViewModel : RevolverViewModelInterface<MyRevolverEvent, MyRevolverState, MyRevolverEffect> {
+    private val _state = MutableStateFlow<MyRevolverState>(MyRevolverState.InitialRevolverState)
+    override val state = _state.cStateFlow()
+    override val effect = MutableSharedFlow<MyRevolverEffect>().cSharedFlow()
+
+    override fun emit(event: MyRevolverEvent) {
+        _state.value = MyRevolverState.FirstRevolverState
     }
 }
