@@ -47,7 +47,7 @@ dependencyResolutionManagement {
 Then declare the dependency in your `commonMain` source set:
 
 ```kotlin
-implementation("com.umain:revolver:1.6.0")
+implementation("com.umain:revolver:1.7.0")
 ```
 
 <br/>

@@ -1,5 +1,8 @@
 # Documentation update log
 
+## 2026-10-19
+* **Update**: Bumped the install snippet in [Getting started](getting-started.md) to version 1.7.0.
+
 ## 2026-10-14
 * **Update**: Registering a second error handler for the same exception type now throws `IllegalStateException`, as event handlers already did. Earlier versions silently replaced the handler. Updated [Core concepts](concepts.md), [Error handling](error-handling.md) and the [API reference](api-reference.md).
 * **Update**: Converted `docs/` into an OKF v0.2 bundle. Each concept now has `type`, `title`, `description`, `tags`, `generated` and `sources` frontmatter, and the root [index](index.md) declares `okf_version`.

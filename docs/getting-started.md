@@ -4,7 +4,7 @@ title: Getting started
 description: Install Revolver, then build and connect your first ViewModel on Android and iOS.
 tags: [installation, setup, android, compose, ios]
 status: stable
-generated: { by: claude-code/claude-opus-5-5, at: 2026-10-14T21:23:43Z }
+generated: { by: claude-code/claude-opus-5-5, at: 2026-10-19T12:32:31Z }
 sources:
   - id: build-config
     resource: https://github.com/apegroup/revolver/blob/main/revolver/build.gradle.kts
@@ -42,7 +42,7 @@ Then add the dependency to `commonMain`:
 kotlin {
     sourceSets {
         commonMain.dependencies {
-            implementation("com.umain:revolver:1.6.0")
+            implementation("com.umain:revolver:1.7.0")
         }
     }
 }
